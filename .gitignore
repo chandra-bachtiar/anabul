@@ -1,0 +1,19 @@
+# Env
+.env
+.env.*
+!.env.example
+
+# Go
+bin/
+apps/api/anabul
+
+# Node
+node_modules/
+
+# Frontend hasil build yang di-embed ke binary Go
+apps/api/internal/webui/dist/*
+!apps/api/internal/webui/dist/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
