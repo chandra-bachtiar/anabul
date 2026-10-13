@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+
+@plugin 'daisyui' {
+	themes: false;
+	logs: false;
+}
+
+/* Token mengikuti docs/UI_SPEC.md (krem hangat + oranye kucing). */
+@plugin 'daisyui/theme' {
+	name: 'anabul';
+	default: true;
+	color-scheme: light;
+
+	--color-base-100: #fff8ec;
+	--color-base-200: #ffffff;
+	--color-base-300: #f0e2cd;
+	--color-base-content: #3b2a20;
+
+	--color-primary: #ff9f43;
+	--color-primary-content: #3b2a20;
+	--color-secondary: #ff8fa3;
+	--color-secondary-content: #3b2a20;
+	--color-accent: #5bb5f0;
+	--color-accent-content: #3b2a20;
+	--color-neutral: #3b2a20;
+	--color-neutral-content: #fff1de;
+
+	--color-info: #5bb5f0;
+	--color-info-content: #3b2a20;
+	--color-success: #3cc48b;
+	--color-success-content: #3b2a20;
+	--color-warning: #ffc145;
+	--color-warning-content: #3b2a20;
+	--color-error: #f0566a;
+	--color-error-content: #1e1712;
+
+	--radius-selector: 0.5rem;
+	--radius-field: 1rem;
+	--radius-box: 1.5rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+@plugin 'daisyui/theme' {
+	name: 'anabul-dark';
+	prefersdark: true;
+	color-scheme: dark;
+
+	--color-base-100: #1e1712;
+	--color-base-200: #2a211a;
+	--color-base-300: #3b2a20;
+	--color-base-content: #fff1de;
+
+	--color-primary: #ff9f43;
+	--color-primary-content: #1e1712;
+	--color-secondary: #ff8fa3;
+	--color-secondary-content: #1e1712;
+	--color-accent: #5bb5f0;
+	--color-accent-content: #1e1712;
+	--color-neutral: #3b2a20;
+	--color-neutral-content: #fff1de;
+
+	--color-info: #5bb5f0;
+	--color-info-content: #1e1712;
+	--color-success: #3cc48b;
+	--color-success-content: #1e1712;
+	--color-warning: #ffc145;
+	--color-warning-content: #1e1712;
+	--color-error: #ff7285;
+	--color-error-content: #1e1712;
+
+	--radius-selector: 0.5rem;
+	--radius-field: 1rem;
+	--radius-box: 1.5rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+@font-face {
+	font-family: 'Nunito';
+	font-style: normal;
+	font-weight: 400 800;
+	font-display: swap;
+	src: url('/fonts/nunito-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+		U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+		U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Fredoka';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/fredoka-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+		U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+		U+FEFF, U+FFFD;
+}
+
+@theme {
+	--font-sans: 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif;
+	--font-display: 'Fredoka', 'Baloo 2', 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif;
+}
+
+html {
+	font-family: var(--font-sans);
+}
