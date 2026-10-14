@@ -31,6 +31,9 @@ build-web:
 	rm -rf $(DIST_DIR)
 	mkdir -p $(DIST_DIR)
 	cp -r $(WEB_DIR)/build/. $(DIST_DIR)/
+	# Penanda ini yang membuat folder dist tetap ada di git, karena `go:embed`
+	# butuh folder itu ada saat build tanpa frontend (mis. `go build ./...`).
+	touch $(DIST_DIR)/.gitkeep
 
 build: build-web
 	mkdir -p bin
