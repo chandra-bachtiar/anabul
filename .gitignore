@@ -14,6 +14,9 @@ node_modules/
 apps/api/internal/webui/dist/*
 !apps/api/internal/webui/dist/.gitkeep
 
+# Hasil backup database
+backups/
+
 # OS / editor
 .DS_Store
 Thumbs.db

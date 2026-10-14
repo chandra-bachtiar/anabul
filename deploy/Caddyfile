@@ -1,0 +1,12 @@
+# Konfigurasi Caddy untuk deployment publik: HTTPS otomatis dari Let's Encrypt.
+# Isi DOMAIN lewat environment (lihat docker-compose.prod.yml).
+{$DOMAIN} {
+	encode zstd gzip
+
+	# HSTS aman ditambahkan di sini karena Caddy yang memegang TLS.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	reverse_proxy app:8080
+}

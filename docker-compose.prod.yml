@@ -1,0 +1,47 @@
+# Deployment produksi: aplikasi + reverse proxy Caddy dengan HTTPS otomatis.
+#
+# Pakai:
+#   DOMAIN=anabul.contoh.com docker compose -f docker-compose.prod.yml up -d --build
+#
+# Database tidak ikut container: isi DATABASE_URL di .env (mis. Neon).
+# Berkas .env dibaca apa adanya untuk container app, jadi tanda $ pada hash
+# password tidak perlu di-escape.
+services:
+  app:
+    build: .
+    image: anabul
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Aplikasi berada di belakang Caddy, jadi header X-Forwarded-* boleh
+      # dipercaya (cookie Secure dan pembatasan percobaan login per IP asli).
+      TRUST_PROXY: "true"
+    expose:
+      - "8080"
+    networks:
+      - anabul
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:?isi DOMAIN, mis. DOMAIN=anabul.contoh.com docker compose -f docker-compose.prod.yml up -d}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - anabul
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  anabul:
