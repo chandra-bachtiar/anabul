@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type intentCase struct {
@@ -17,7 +18,13 @@ type intentCase struct {
 	Person    string `json:"person"`
 	Direction string `json:"direction"`
 	Category  string `json:"category"`
+	// Date: kosong berarti tidak diperiksa, "" eksplisit berarti harus kosong,
+	// "kemarin" dihitung dari waktu uji, selebihnya dibandingkan apa adanya.
+	Date *string `json:"date"`
 }
+
+// waktuUji dipakai supaya harapan tanggal di testdata bersifat tetap.
+var waktuUji = time.Date(2026, time.October, 14, 9, 0, 0, 0, time.FixedZone("WIB", 7*60*60))
 
 // TestParseIntent adalah regresi pesan -> tool call memakai contoh di PRD.
 func TestParseIntent(t *testing.T) {
@@ -35,7 +42,7 @@ func TestParseIntent(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Message, func(t *testing.T) {
-			got := parseIntent(tc.Message)
+			got := parseIntent(tc.Message, waktuUji)
 			if got.Tool != tc.Tool {
 				t.Fatalf("tool = %q, ingin %q", got.Tool, tc.Tool)
 			}
@@ -57,7 +64,59 @@ func TestParseIntent(t *testing.T) {
 			if tc.Category != "" && !strings.Contains(strings.ToLower(got.Category), tc.Category) {
 				t.Fatalf("category = %q, ingin mengandung %q", got.Category, tc.Category)
 			}
+			if tc.Date != nil {
+				ingin := *tc.Date
+				switch ingin {
+				case "kemarin":
+					ingin = waktuUji.AddDate(0, 0, -1).Format("2006-01-02")
+				case "hari ini":
+					ingin = waktuUji.Format("2006-01-02")
+				}
+				if got.Date != ingin {
+					t.Fatalf("date = %q, ingin %q", got.Date, ingin)
+				}
+			}
 		})
+	}
+}
+
+func TestTanggalDariPesan(t *testing.T) {
+	cases := []struct {
+		nama  string
+		pesan string
+		ingin string
+	}{
+		{nama: "kemarin", pesan: "kopi kemarin 25rb", ingin: "2026-10-13"},
+		{nama: "hari ini", pesan: "parkir tadi 5rb", ingin: "2026-10-14"},
+		{nama: "tanggal bulan ini", pesan: "belanja tgl 5 40rb", ingin: "2026-10-05"},
+		{nama: "tanggal yang sudah lewat dipakai bulan lalu", pesan: "belanja tanggal 20 150rb", ingin: "2026-09-20"},
+		{nama: "tanggal akhir bulan dipangkas", pesan: "sewa tanggal 31 100rb", ingin: "2026-09-30"},
+		{nama: "tanpa keterangan waktu", pesan: "kopi 25rb", ingin: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.nama, func(t *testing.T) {
+			got := parseIntent(tc.pesan, waktuUji)
+			if got.Date != tc.ingin {
+				t.Fatalf("date = %q, ingin %q", got.Date, tc.ingin)
+			}
+		})
+	}
+}
+
+func TestWaktuDariTanggal(t *testing.T) {
+	hasil := waktuDariTanggal("2026-10-13", waktuUji)
+	if hasil == nil {
+		t.Fatal("tanggal valid harus menghasilkan waktu")
+	}
+	if hasil.Format("2006-01-02 15:04") != "2026-10-13 09:00" {
+		t.Fatalf("waktu gabungan = %s, ingin 2026-10-13 09:00", hasil.Format("2006-01-02 15:04"))
+	}
+	if waktuDariTanggal("", waktuUji) != nil {
+		t.Fatal("tanggal kosong harus menghasilkan nil")
+	}
+	if waktuDariTanggal("bukan-tanggal", waktuUji) != nil {
+		t.Fatal("tanggal tidak valid harus menghasilkan nil")
 	}
 }
 

@@ -69,6 +69,7 @@ func (a *Agent) systemPrompt(ctx context.Context, channel string) string {
 
 	b.WriteString("\nAturan: panggil tool untuk setiap perubahan data. Aksi berisiko (hapus transaksi, tutup bulan, buka bulan) tidak dieksekusi langsung; tool akan mengembalikan needs_confirmation dan pengguna yang memutuskan.\n")
 	b.WriteString("Nominal selalu integer rupiah tanpa titik atau koma.\n")
+	b.WriteString("Kalau pengguna menyebut waktu lain (mis. \"kemarin\", \"tgl 5\"), isi argumen date dengan format YYYY-MM-DD sesuai tanggal hari ini di atas. Kalau tidak disebut, biarkan kosong supaya dicatat hari ini.\n")
 	return b.String()
 }
 

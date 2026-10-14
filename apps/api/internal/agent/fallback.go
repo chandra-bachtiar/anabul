@@ -3,7 +3,9 @@ package agent
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"anabul/internal/tools"
 )
@@ -19,6 +21,9 @@ type parsedIntent struct {
 	Direction string `json:"direction,omitempty"`
 	Category  string `json:"category,omitempty"`
 	Month     string `json:"month,omitempty"`
+	// Date berisi tanggal "YYYY-MM-DD" kalau pesan menyebut waktu lain,
+	// mis. "kopi kemarin 25rb".
+	Date string `json:"date,omitempty"`
 }
 
 var (
@@ -28,6 +33,10 @@ var (
 	// Frasa "sudah dibayar" harus dibaca utuh supaya tidak menyisakan huruf.
 	paidPhraseRe = regexp.MustCompile(`\b(?:sudah|udah|telah)?\s*(?:dibayar(?:in|kan)?|bayar|lunas|terbayar)\b`)
 	fillerWords  = []string{"dong", "nih", "ya", "sih", "deh", "kah"}
+
+	waktuKemarinRe = regexp.MustCompile(`\b(kemarin|kmrn|semalam)\b`)
+	waktuHariIniRe = regexp.MustCompile(`\b(hari ini|tadi|barusan|baru aja)\b`)
+	waktuTanggalRe = regexp.MustCompile(`\b(?:tanggal|tgl)\s+(\d{1,2})\b`)
 )
 
 var incomeWords = []string{"gajian", "gaji", "bonus", "thr", "pemasukan", "dapat", "terima", "masuk"}
@@ -37,15 +46,19 @@ var paymentWords = []string{"bayar", "nyicil", "cicil", "melunasi"}
 
 // parseIntent membaca maksud pesan dengan aturan sederhana. Dipakai kalau LLM
 // belum dikonfigurasi, dan jadi jaring pengaman kalau model tidak tersedia.
-func parseIntent(message string) parsedIntent {
+// Waktu "sekarang" dikirim dari pemanggil supaya hasilnya bisa diuji tetap.
+func parseIntent(message string, now time.Time) parsedIntent {
 	raw := strings.TrimSpace(message)
 	lower := strings.ToLower(raw)
+	tanggal := dateFromMessage(lower, now)
+	// Kata waktu dibuang dulu supaya angka di "tgl 5" tidak dikira nominal.
+	tanpaWaktu := buangKeteranganWaktu(lower)
 
 	// "Budi udah bayar 100rb" / "bayar hutang Budi 100rb"
 	if containsAny(lower, paymentWords) && !isNeedPayment(lower) {
 		if person, ok := personBeforePayment(lower); ok {
-			if amount, ok := lastAmount(lower); ok {
-				return parsedIntent{Tool: "add_debt_payment", Person: person, Amount: amount}
+			if amount, ok := lastAmount(tanpaWaktu); ok {
+				return parsedIntent{Tool: "add_debt_payment", Person: person, Amount: amount, Date: tanggal}
 			}
 		}
 	}
@@ -54,7 +67,7 @@ func parseIntent(message string) parsedIntent {
 	if containsAny(lower, paidWords) {
 		if name := needName(lower); name != "" {
 			amount := int64(0)
-			if parsed, ok := lastAmount(lower); ok {
+			if parsed, ok := lastAmount(tanpaWaktu); ok {
 				amount = parsed
 			}
 			intent := parsedIntent{Tool: "mark_need_paid", Note: name}
@@ -87,9 +100,15 @@ func parseIntent(message string) parsedIntent {
 		return parsedIntent{Tool: "close_month"}
 	}
 
-	// "kopi 25rb", "makan siang 35000", "gajian 5jt"
-	if amount, ok := lastAmount(lower); ok {
-		intent := parsedIntent{Tool: "add_transaction", Amount: amount, Type: "expense", Note: noteOf(raw, amount)}
+	// "kopi 25rb", "makan siang 35000", "gajian 5jt", "kopi kemarin 25rb"
+	if amount, ok := lastAmount(tanpaWaktu); ok {
+		intent := parsedIntent{
+			Tool:   "add_transaction",
+			Amount: amount,
+			Type:   "expense",
+			Note:   noteOf(raw, amount),
+			Date:   tanggal,
+		}
 		if containsAny(lower, incomeWords) {
 			intent.Type = "income"
 		}
@@ -99,17 +118,48 @@ func parseIntent(message string) parsedIntent {
 	return parsedIntent{}
 }
 
+// dateFromMessage membaca keterangan waktu sederhana: "kemarin", "hari ini",
+// "tadi", atau "tanggal 12". Mengembalikan tanggal "YYYY-MM-DD" di zona lokasi
+// yang dipakai aplikasi, atau string kosong kalau tidak ada keterangan waktu.
+//
+// Aturan "tanggal N": kalau harinya belum lewat di bulan ini, yang dimaksud
+// adalah tanggal N bulan ini; kalau sudah lewat, dipakai bulan sebelumnya karena
+// catatan biasanya ditulis setelah kejadiannya.
+func dateFromMessage(lower string, now time.Time) string {
+	switch {
+	case waktuKemarinRe.MatchString(lower):
+		return now.AddDate(0, 0, -1).Format("2006-01-02")
+	case waktuTanggalRe.MatchString(lower):
+		cocok := waktuTanggalRe.FindStringSubmatch(lower)
+		hari, err := strconv.Atoi(cocok[1])
+		if err != nil || hari < 1 || hari > 31 {
+			return ""
+		}
+		bulanIni := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		if hari <= now.Day() {
+			return tools.DueDateFromDay(bulanIni, hari).Format("2006-01-02")
+		}
+		return tools.DueDateFromDay(bulanIni.AddDate(0, -1, 0), hari).Format("2006-01-02")
+	case waktuHariIniRe.MatchString(lower):
+		return now.Format("2006-01-02")
+	default:
+		return ""
+	}
+}
+
 func (a *Agent) runParser(ctx context.Context, channel, message string) (string, []map[string]any, error) {
-	intent := parseIntent(message)
+	now := a.tools.Now()
+	intent := parseIntent(message, now)
 	log := make([]map[string]any, 0, 1)
 
 	switch intent.Tool {
 	case "add_transaction":
 		tx, err := a.tools.AddTransaction(ctx, tools.AddTransactionInput{
-			Type:   intent.Type,
-			Amount: intent.Amount,
-			Note:   intent.Note,
-			Source: normalizeChannel(channel),
+			Type:       intent.Type,
+			Amount:     intent.Amount,
+			Note:       intent.Note,
+			OccurredAt: waktuDariTanggal(intent.Date, now),
+			Source:     normalizeChannel(channel),
 		})
 		if err != nil {
 			return friendlyError(err), log, nil
@@ -146,8 +196,10 @@ func (a *Agent) runParser(ctx context.Context, channel, message string) (string,
 		return "Hutang ke " + intent.Person + " " + tools.FormatAmount(debt.AmountTotal) + " sudah dicatat.", log, nil
 	case "add_debt_payment":
 		debt, err := a.tools.AddDebtPayment(ctx, tools.AddDebtPaymentInput{
-			Person: intent.Person,
-			Amount: intent.Amount,
+			Person:         intent.Person,
+			Amount:         intent.Amount,
+			PaidAt:         waktuDariTanggal(intent.Date, now),
+			CatatTransaksi: true,
 		})
 		if err != nil {
 			return friendlyError(err), log, nil
@@ -260,7 +312,8 @@ func lastAmount(text string) (int64, bool) {
 	return 0, false
 }
 
-// noteOf mengambil catatan dengan membuang nominal dari pesan.
+// noteOf mengambil catatan dengan membuang nominal dan keterangan waktu dari
+// pesan, mis. "kopi kemarin 25rb" -> "kopi".
 func noteOf(original string, amount int64) string {
 	lower := strings.ToLower(original)
 	matches := amountRe.FindAllStringIndex(lower, -1)
@@ -268,10 +321,35 @@ func noteOf(original string, amount int64) string {
 		candidate := strings.TrimSpace(lower[matches[i][0]:matches[i][1]])
 		if parsed, err := tools.ParseAmount(candidate); err == nil && parsed == amount {
 			note := strings.TrimSpace(original[:matches[i][0]] + original[matches[i][1]:])
-			return trailingRe.ReplaceAllString(note, " ")
+			return buangKeteranganWaktu(note)
 		}
 	}
-	return strings.TrimSpace(original)
+	return buangKeteranganWaktu(strings.TrimSpace(original))
+}
+
+// buangKeteranganWaktu menghapus kata waktu dari catatan supaya tidak ikut
+// tersimpan sebagai nama pengeluaran.
+func buangKeteranganWaktu(note string) string {
+	bersih := waktuKemarinRe.ReplaceAllString(note, " ")
+	bersih = waktuHariIniRe.ReplaceAllString(bersih, " ")
+	bersih = waktuTanggalRe.ReplaceAllString(bersih, " ")
+	return strings.TrimSpace(trailingRe.ReplaceAllString(bersih, " "))
+}
+
+// waktuDariTanggal menggabungkan tanggal "YYYY-MM-DD" dengan jam saat ini di
+// zona aplikasi. Mengembalikan nil kalau tanggalnya kosong atau tidak valid,
+// supaya tool memakai waktu sekarang.
+func waktuDariTanggal(tanggal string, now time.Time) *time.Time {
+	tanggal = strings.TrimSpace(tanggal)
+	if tanggal == "" {
+		return nil
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", tanggal, now.Location())
+	if err != nil {
+		return nil
+	}
+	gabung := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), now.Hour(), now.Minute(), now.Second(), 0, now.Location())
+	return &gabung
 }
 
 func personBeforePayment(lower string) (string, bool) {

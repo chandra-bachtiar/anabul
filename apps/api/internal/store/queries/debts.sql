@@ -9,10 +9,13 @@ SELECT
   d.status,
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
-  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining
+  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
+  COALESCE(p.jumlah, 0)::bigint AS payment_count,
+  p.terakhir::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id
+  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE (sqlc.narg('status')::text IS NULL OR d.status = sqlc.narg('status'))
   AND (sqlc.narg('person')::text IS NULL OR d.person ILIKE sqlc.narg('person'))
@@ -29,10 +32,13 @@ SELECT
   d.status,
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
-  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining
+  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
+  COALESCE(p.jumlah, 0)::bigint AS payment_count,
+  p.terakhir::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id
+  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE d.id = $1;
 

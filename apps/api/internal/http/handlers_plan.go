@@ -259,8 +259,9 @@ func (s *Server) handleCreateDebtPayment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var payload struct {
-		Amount int64   `json:"amount"`
-		PaidAt *string `json:"paid_at"`
+		Amount            int64   `json:"amount"`
+		PaidAt            *string `json:"paid_at"`
+		RecordTransaction *bool   `json:"record_transaction"`
 	}
 	if !decodeJSON(w, r, &payload) {
 		return
@@ -269,10 +270,17 @@ func (s *Server) handleCreateDebtPayment(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
+	// Secara bawaan pembayaran ikut dicatat sebagai transaksi supaya arus kas
+	// bulan itu terhitung; bisa dimatikan dengan record_transaction: false.
+	catatTransaksi := true
+	if payload.RecordTransaction != nil {
+		catatTransaksi = *payload.RecordTransaction
+	}
 	debt, err := s.tools.AddDebtPayment(r.Context(), tools.AddDebtPaymentInput{
-		DebtID: &id,
-		Amount: payload.Amount,
-		PaidAt: paidAt,
+		DebtID:         &id,
+		Amount:         payload.Amount,
+		PaidAt:         paidAt,
+		CatatTransaksi: catatTransaksi,
 	})
 	if err != nil {
 		writeError(w, err)

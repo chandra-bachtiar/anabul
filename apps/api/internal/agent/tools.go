@@ -73,13 +73,14 @@ func (a *Agent) registry() []toolDef {
 	return []toolDef{
 		{
 			Name:        "add_transaction",
-			Description: "Catat pengeluaran atau pemasukan baru.",
+			Description: "Catat pengeluaran atau pemasukan baru. Isi date kalau pengguna menyebut waktu lain, misalnya kemarin atau tanggal tertentu.",
 			Parameters: schema(map[string]any{
 				"amount":   integer(amountHint),
 				"note":     str("catatan singkat, mis. kopi"),
 				"type":     strEnum("expense untuk pengeluaran, income untuk pemasukan", "expense", "income"),
 				"category": str("nama kategori (opsional)"),
 				"account":  str("nama akun: cash, bank, e-wallet (opsional)"),
+				"date":     str("tanggal catatan format YYYY-MM-DD kalau bukan hari ini, mis. kemarin berarti tanggal kemarin"),
 			}, "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -88,6 +89,7 @@ func (a *Agent) registry() []toolDef {
 					Type     string      `json:"type"`
 					Category string      `json:"category"`
 					Account  string      `json:"account"`
+					Date     string      `json:"date"`
 				}
 				if err := decodeArgs(args, &in); err != nil {
 					return nil, err
@@ -96,13 +98,18 @@ func (a *Agent) registry() []toolDef {
 				if err != nil {
 					return nil, err
 				}
+				occurredAt, err := parseDate(in.Date, a.tools.Location())
+				if err != nil {
+					return nil, err
+				}
 				tx, err := a.tools.AddTransaction(ctx, tools.AddTransactionInput{
-					Type:     in.Type,
-					Amount:   amount,
-					Note:     in.Note,
-					Category: in.Category,
-					Account:  in.Account,
-					Source:   channelFrom(ctx),
+					Type:       in.Type,
+					Amount:     amount,
+					Note:       in.Note,
+					Category:   in.Category,
+					Account:    in.Account,
+					OccurredAt: occurredAt,
+					Source:     channelFrom(ctx),
 				})
 				if err != nil {
 					return nil, err
@@ -115,6 +122,7 @@ func (a *Agent) registry() []toolDef {
 					"type":     tx.Type,
 					"category": tx.CategoryName,
 					"month":    tx.Month,
+					"date":     tx.OccurredAt.Format("2006-01-02"),
 				}, nil
 			},
 		},
@@ -373,17 +381,21 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "add_debt_payment",
-			Description: "Catat pembayaran/cicilan hutang atau piutang.",
+			Description: "Catat pembayaran/cicilan hutang atau piutang. Pembayaran otomatis dibuatkan transaksi (pengeluaran untuk hutang, pemasukan untuk piutang) kecuali record_transaction diisi false.",
 			Parameters: schema(map[string]any{
-				"person":  str("nama orang"),
-				"debt_id": integer("id hutang kalau diketahui"),
-				"amount":  integer(amountHint),
+				"person":             str("nama orang"),
+				"debt_id":            integer("id hutang kalau diketahui"),
+				"amount":             integer(amountHint),
+				"date":               str("tanggal pembayaran format YYYY-MM-DD kalau bukan hari ini"),
+				"record_transaction": boolean("false kalau pembayaran tidak boleh masuk catatan harian (bawaan true)"),
 			}, "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
-					Person string      `json:"person"`
-					DebtID *int64      `json:"debt_id"`
-					Amount json.Number `json:"amount"`
+					Person            string      `json:"person"`
+					DebtID            *int64      `json:"debt_id"`
+					Amount            json.Number `json:"amount"`
+					Date              string      `json:"date"`
+					RecordTransaction *bool       `json:"record_transaction"`
 				}
 				if err := decodeArgs(args, &in); err != nil {
 					return nil, err
@@ -392,22 +404,35 @@ func (a *Agent) registry() []toolDef {
 				if err != nil {
 					return nil, err
 				}
+				paidAt, err := parseDate(in.Date, a.tools.Location())
+				if err != nil {
+					return nil, err
+				}
+				catat := true
+				if in.RecordTransaction != nil {
+					catat = *in.RecordTransaction
+				}
 				debt, err := a.tools.AddDebtPayment(ctx, tools.AddDebtPaymentInput{
-					Person: in.Person,
-					DebtID: in.DebtID,
-					Amount: amount,
+					Person:         in.Person,
+					DebtID:         in.DebtID,
+					Amount:         amount,
+					PaidAt:         paidAt,
+					CatatTransaksi: catat,
 				})
 				if err != nil {
 					return nil, err
 				}
 				return map[string]any{
-					"ok":        true,
-					"id":        debt.ID,
-					"person":    debt.Person,
-					"direction": debt.Direction,
-					"paid":      debt.Paid,
-					"remaining": debt.Remaining,
-					"status":    debt.Status,
+					"ok":                 true,
+					"id":                 debt.ID,
+					"person":             debt.Person,
+					"direction":          debt.Direction,
+					"paid":               debt.Paid,
+					"remaining":          debt.Remaining,
+					"status":             debt.Status,
+					"payment_count":      debt.PaymentCount,
+					"last_payment":       debt.LastPaymentAt,
+					"record_transaction": catat,
 				}, nil
 			},
 		},

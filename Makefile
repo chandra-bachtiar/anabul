@@ -19,7 +19,8 @@ migrate:
 	cd $(API_DIR) && go run ./cmd/migrate
 
 sqlc:
-	cd $(API_DIR) && sqlc generate
+	# Pakai image resmi supaya tidak perlu memasang sqlc di mesin.
+	docker run --rm -v "$(CURDIR)/$(API_DIR):/src" -w /src sqlc/sqlc generate
 
 test:
 	cd $(API_DIR) && go test ./...

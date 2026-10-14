@@ -74,18 +74,20 @@ type DebtPaymentRow struct {
 
 // DebtRow adalah hutang/piutang beserta sisa dan riwayat pembayaran.
 type DebtRow struct {
-	ID          int64            `json:"id"`
-	Person      string           `json:"person"`
-	Direction   string           `json:"direction"`
-	AmountTotal int64            `json:"amount_total"`
-	Paid        int64            `json:"paid"`
-	Remaining   int64            `json:"remaining"`
-	Note        string           `json:"note"`
-	DueDate     *string          `json:"due_date"`
-	Status      string           `json:"status"`
-	Overdue     bool             `json:"overdue"`
-	CreatedAt   time.Time        `json:"created_at"`
-	Payments    []DebtPaymentRow `json:"payments,omitempty"`
+	ID            int64            `json:"id"`
+	Person        string           `json:"person"`
+	Direction     string           `json:"direction"`
+	AmountTotal   int64            `json:"amount_total"`
+	Paid          int64            `json:"paid"`
+	Remaining     int64            `json:"remaining"`
+	Note          string           `json:"note"`
+	DueDate       *string          `json:"due_date"`
+	Status        string           `json:"status"`
+	Overdue       bool             `json:"overdue"`
+	CreatedAt     time.Time        `json:"created_at"`
+	PaymentCount  int64            `json:"payment_count"`
+	LastPaymentAt *time.Time       `json:"last_payment_at"`
+	Payments      []DebtPaymentRow `json:"payments,omitempty"`
 }
 
 type DebtTotals struct {

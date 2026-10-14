@@ -193,25 +193,30 @@ SELECT
   d.status,
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
-  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining
+  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
+  COALESCE(p.jumlah, 0)::bigint AS payment_count,
+  p.terakhir::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id
+  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE d.id = $1
 `
 
 type GetDebtRow struct {
-	ID          int64
-	Person      string
-	Direction   string
-	AmountTotal int64
-	Note        string
-	DueDate     pgtype.Date
-	Status      string
-	CreatedAt   pgtype.Timestamptz
-	Paid        int64
-	Remaining   int64
+	ID            int64
+	Person        string
+	Direction     string
+	AmountTotal   int64
+	Note          string
+	DueDate       pgtype.Date
+	Status        string
+	CreatedAt     pgtype.Timestamptz
+	Paid          int64
+	Remaining     int64
+	PaymentCount  int64
+	LastPaymentAt pgtype.Timestamptz
 }
 
 func (q *Queries) GetDebt(ctx context.Context, id int64) (GetDebtRow, error) {
@@ -228,6 +233,8 @@ func (q *Queries) GetDebt(ctx context.Context, id int64) (GetDebtRow, error) {
 		&i.CreatedAt,
 		&i.Paid,
 		&i.Remaining,
+		&i.PaymentCount,
+		&i.LastPaymentAt,
 	)
 	return i, err
 }
@@ -273,10 +280,13 @@ SELECT
   d.status,
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
-  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining
+  (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
+  COALESCE(p.jumlah, 0)::bigint AS payment_count,
+  p.terakhir::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id
+  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE ($1::text IS NULL OR d.status = $1)
   AND ($2::text IS NULL OR d.person ILIKE $2)
@@ -289,16 +299,18 @@ type ListDebtsParams struct {
 }
 
 type ListDebtsRow struct {
-	ID          int64
-	Person      string
-	Direction   string
-	AmountTotal int64
-	Note        string
-	DueDate     pgtype.Date
-	Status      string
-	CreatedAt   pgtype.Timestamptz
-	Paid        int64
-	Remaining   int64
+	ID            int64
+	Person        string
+	Direction     string
+	AmountTotal   int64
+	Note          string
+	DueDate       pgtype.Date
+	Status        string
+	CreatedAt     pgtype.Timestamptz
+	Paid          int64
+	Remaining     int64
+	PaymentCount  int64
+	LastPaymentAt pgtype.Timestamptz
 }
 
 func (q *Queries) ListDebts(ctx context.Context, arg ListDebtsParams) ([]ListDebtsRow, error) {
@@ -321,6 +333,8 @@ func (q *Queries) ListDebts(ctx context.Context, arg ListDebtsParams) ([]ListDeb
 			&i.CreatedAt,
 			&i.Paid,
 			&i.Remaining,
+			&i.PaymentCount,
+			&i.LastPaymentAt,
 		); err != nil {
 			return nil, err
 		}

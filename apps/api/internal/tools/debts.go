@@ -28,6 +28,10 @@ type AddDebtPaymentInput struct {
 	Amount        int64
 	PaidAt        *time.Time
 	TransactionID *int64
+	// CatatTransaksi menentukan apakah pembayaran ikut dicatat sebagai
+	// pengeluaran (hutang) atau pemasukan (piutang) di catatan harian, supaya
+	// arus kas bulan itu ikut terhitung.
+	CatatTransaksi bool
 }
 
 // AddDebt mencatat hutang (user berhutang) atau piutang (orang berhutang ke user).
@@ -83,11 +87,35 @@ func (s *Service) AddDebtPayment(ctx context.Context, in AddDebtPaymentInput) (D
 	}
 
 	err = s.InTx(ctx, func(q *store.Queries) error {
+		transactionID := in.TransactionID
+
+		// Pembayaran hutang mengeluarkan uang, pembayaran piutang menerima uang.
+		// Keduanya dicatat sebagai transaksi supaya total bulan ini sesuai.
+		if in.CatatTransaksi && transactionID == nil {
+			txType := "expense"
+			note := "Bayar hutang ke " + debt.Person
+			if debt.Direction == "piutang" {
+				txType = "income"
+				note = "Terima pembayaran dari " + debt.Person
+			}
+			tx, txErr := s.createTransaction(ctx, q, AddTransactionInput{
+				Type:       txType,
+				Amount:     in.Amount,
+				Note:       note,
+				OccurredAt: &paidAt,
+				Source:     "debt",
+			})
+			if txErr != nil {
+				return txErr
+			}
+			transactionID = &tx.ID
+		}
+
 		if _, err := q.CreateDebtPayment(ctx, store.CreateDebtPaymentParams{
 			DebtID:        debt.ID,
 			Amount:        in.Amount,
 			PaidAt:        pgtype.Timestamptz{Time: paidAt, Valid: true},
-			TransactionID: int8Ptr(in.TransactionID),
+			TransactionID: int8Ptr(transactionID),
 		}); err != nil {
 			return err
 		}
@@ -124,17 +152,19 @@ func (s *Service) ListDebts(ctx context.Context, status, person string) ([]DebtR
 	result := make([]DebtRow, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, DebtRow{
-			ID:          row.ID,
-			Person:      row.Person,
-			Direction:   row.Direction,
-			AmountTotal: row.AmountTotal,
-			Paid:        row.Paid,
-			Remaining:   row.Remaining,
-			Note:        row.Note,
-			DueDate:     formatDate(dateValue(row.DueDate)),
-			Status:      row.Status,
-			Overdue:     isOverdue(row.DueDate, row.Status, today),
-			CreatedAt:   row.CreatedAt.Time.In(s.loc),
+			ID:            row.ID,
+			Person:        row.Person,
+			Direction:     row.Direction,
+			AmountTotal:   row.AmountTotal,
+			Paid:          row.Paid,
+			Remaining:     row.Remaining,
+			Note:          row.Note,
+			DueDate:       formatDate(dateValue(row.DueDate)),
+			Status:        row.Status,
+			Overdue:       isOverdue(row.DueDate, row.Status, today),
+			CreatedAt:     row.CreatedAt.Time.In(s.loc),
+			PaymentCount:  row.PaymentCount,
+			LastPaymentAt: timeValue(row.LastPaymentAt, s.loc),
 		})
 	}
 	return result, nil
@@ -171,6 +201,7 @@ func (s *Service) DebtTotals(ctx context.Context) (DebtTotals, error) {
 
 type debtRecord struct {
 	ID          int64
+	Person      string
 	AmountTotal int64
 	Direction   string
 }
@@ -187,7 +218,7 @@ func (s *Service) pickDebt(ctx context.Context, in AddDebtPaymentInput) (debtRec
 		if detail.Status == "settled" {
 			return debtRecord{}, &Error{Code: CodeConflict, Message: "hutang/piutang " + detail.Person + " sudah lunas"}
 		}
-		return debtRecord{ID: detail.ID, AmountTotal: detail.AmountTotal, Direction: detail.Direction}, nil
+		return debtRecord{ID: detail.ID, Person: detail.Person, AmountTotal: detail.AmountTotal, Direction: detail.Direction}, nil
 	}
 
 	person := strings.TrimSpace(in.Person)
@@ -202,7 +233,12 @@ func (s *Service) pickDebt(ctx context.Context, in AddDebtPaymentInput) (debtRec
 	case 0:
 		return debtRecord{}, notFound("tidak ada hutang/piutang berjalan untuk %s", person)
 	case 1:
-		return debtRecord{ID: candidates[0].ID, AmountTotal: candidates[0].AmountTotal, Direction: candidates[0].Direction}, nil
+		return debtRecord{
+			ID:          candidates[0].ID,
+			Person:      candidates[0].Person,
+			AmountTotal: candidates[0].AmountTotal,
+			Direction:   candidates[0].Direction,
+		}, nil
 	}
 
 	options := make([]string, 0, len(candidates))
@@ -235,18 +271,23 @@ func (s *Service) debtRow(id int64, person, direction string, amountTotal int64,
 
 func (s *Service) debtRowFromDetail(detail store.GetDebtRow, payments []DebtPaymentRow) DebtRow {
 	row := DebtRow{
-		ID:          detail.ID,
-		Person:      detail.Person,
-		Direction:   detail.Direction,
-		AmountTotal: detail.AmountTotal,
-		Paid:        detail.Paid,
-		Remaining:   detail.Remaining,
-		Note:        detail.Note,
-		DueDate:     formatDate(dateValue(detail.DueDate)),
-		Status:      detail.Status,
-		Overdue:     isOverdue(detail.DueDate, detail.Status, StartOfDay(s.Now(), s.loc)),
-		CreatedAt:   detail.CreatedAt.Time.In(s.loc),
-		Payments:    payments,
+		ID:            detail.ID,
+		Person:        detail.Person,
+		Direction:     detail.Direction,
+		AmountTotal:   detail.AmountTotal,
+		Paid:          detail.Paid,
+		Remaining:     detail.Remaining,
+		Note:          detail.Note,
+		DueDate:       formatDate(dateValue(detail.DueDate)),
+		Status:        detail.Status,
+		Overdue:       isOverdue(detail.DueDate, detail.Status, StartOfDay(s.Now(), s.loc)),
+		CreatedAt:     detail.CreatedAt.Time.In(s.loc),
+		PaymentCount:  detail.PaymentCount,
+		LastPaymentAt: timeValue(detail.LastPaymentAt, s.loc),
+		Payments:      payments,
+	}
+	if row.Payments == nil && detail.PaymentCount == 0 {
+		row.Payments = []DebtPaymentRow{}
 	}
 	return row
 }

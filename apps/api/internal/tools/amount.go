@@ -250,6 +250,15 @@ func dateValue(v pgtype.Date) *time.Time {
 	return &t
 }
 
+// timeValue mengubah pgtype.Timestamptz menjadi waktu di zona aplikasi.
+func timeValue(v pgtype.Timestamptz, loc *time.Location) *time.Time {
+	if !v.Valid {
+		return nil
+	}
+	t := v.Time.In(loc)
+	return &t
+}
+
 func textValue(v pgtype.Text) *string {
 	if !v.Valid {
 		return nil
