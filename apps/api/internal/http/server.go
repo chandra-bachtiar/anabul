@@ -2,11 +2,14 @@ package http
 
 import (
 	"context"
-	"encoding/json"
-	"log/slog"
 	"net/http"
+	"time"
 
+	"anabul/internal/agent"
+	"anabul/internal/alert"
+	"anabul/internal/auth"
 	"anabul/internal/config"
+	"anabul/internal/tools"
 )
 
 // Pinger adalah bagian database yang dibutuhkan layer HTTP.
@@ -14,30 +17,140 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// ChatRunner adalah agent yang dipakai endpoint chat.
+type ChatRunner interface {
+	Chat(ctx context.Context, channel, message string) (agent.Reply, error)
+	Confirm(ctx context.Context, channel, actionID string) (agent.Reply, error)
+	Cancel(ctx context.Context, actionID string) (agent.Reply, error)
+}
+
+// Deps merangkai kebutuhan server supaya pemanggil tidak perlu menghafal urutan
+// argumen.
+type Deps struct {
+	Cfg   config.Config
+	DB    Pinger
+	Web   http.Handler
+	Tools *tools.Service
+	Chat  ChatRunner
+	Auth  *auth.Manager
+	Alert *alert.Notifier
+	// ScriptHashes adalah hash CSP untuk skrip inline di index.html.
+	ScriptHashes []string
+}
+
 // Server merangkai seluruh route aplikasi.
 type Server struct {
-	cfg config.Config
-	db  Pinger
-	web http.Handler
+	cfg          config.Config
+	db           Pinger
+	web          http.Handler
+	tools        *tools.Service
+	chat         ChatRunner
+	auth         *auth.Manager
+	alert        *alert.Notifier
+	sessions     *sessionManager
+	login        *rateLimiter
+	scriptHashes []string
+	nowFn        func() time.Time
 }
 
-func New(cfg config.Config, db Pinger, web http.Handler) *Server {
-	return &Server{cfg: cfg, db: db, web: web}
+func New(deps Deps) *Server {
+	return &Server{
+		cfg:          deps.Cfg,
+		db:           deps.DB,
+		web:          deps.Web,
+		tools:        deps.Tools,
+		chat:         deps.Chat,
+		auth:         deps.Auth,
+		alert:        deps.Alert,
+		sessions:     newSessionManager(deps.Cfg.SessionSecret, deps.Cfg.SessionSecretPrevious),
+		login:        newRateLimiter(10, 15*time.Minute),
+		scriptHashes: deps.ScriptHashes,
+		nowFn:        time.Now,
+	}
 }
 
-// Handler mengembalikan router utama: /healthz, /api/* (menyusul di fase
-// berikutnya), lalu frontend statis sebagai fallback.
+func (s *Server) now() time.Time { return s.nowFn() }
+
+// Handler mengembalikan router utama: /healthz, /api/*, webhook Telegram, lalu
+// frontend statis sebagai fallback.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
+	mux.HandleFunc("GET /api/auth/me", s.handleMe)
+	mux.HandleFunc("POST /api/auth/password", s.protect(s.handleChangePassword))
+	mux.HandleFunc("POST /telegram/webhook", s.handleTelegramWebhook)
+
+	api := func(method, pattern string, handler http.HandlerFunc) {
+		mux.HandleFunc(method+" "+pattern, s.protect(handler))
+	}
+
+	api("GET", "/api/dashboard", s.handleDashboard)
+	api("GET", "/api/summary", s.handleSummary)
+
+	api("GET", "/api/transactions", s.handleListTransactions)
+	api("POST", "/api/transactions", s.handleCreateTransaction)
+	api("PATCH", "/api/transactions/{id}", s.handleUpdateTransaction)
+	api("DELETE", "/api/transactions/{id}", s.handleDeleteTransaction)
+
+	api("GET", "/api/categories", s.handleListCategories)
+	api("POST", "/api/categories", s.handleCreateCategory)
+	api("PATCH", "/api/categories/{id}", s.handleUpdateCategory)
+	api("DELETE", "/api/categories/{id}", s.handleDeleteCategory)
+
+	api("GET", "/api/accounts", s.handleListAccounts)
+	api("POST", "/api/accounts", s.handleCreateAccount)
+
+	api("GET", "/api/budgets", s.handleListBudgets)
+	api("PUT", "/api/budgets", s.handleSetBudgets)
+	api("POST", "/api/budgets/copy", s.handleCopyBudgets)
+
+	api("GET", "/api/recurring-needs", s.handleListRecurringNeeds)
+	api("POST", "/api/recurring-needs", s.handleCreateRecurringNeed)
+	api("PATCH", "/api/recurring-needs/{id}", s.handleUpdateRecurringNeed)
+	api("DELETE", "/api/recurring-needs/{id}", s.handleDeleteRecurringNeed)
+
+	api("GET", "/api/needs", s.handleListNeeds)
+	api("POST", "/api/needs/generate", s.handleGenerateNeeds)
+	api("POST", "/api/needs/{id}/pay", s.handlePayNeed)
+	api("POST", "/api/needs/{id}/unpay", s.handleUnpayNeed)
+
+	api("GET", "/api/debts", s.handleListDebts)
+	api("POST", "/api/debts", s.handleCreateDebt)
+	api("GET", "/api/debts/{id}", s.handleGetDebt)
+	api("POST", "/api/debts/{id}/payments", s.handleCreateDebtPayment)
+
+	api("GET", "/api/months", s.handleListMonths)
+	api("GET", "/api/months/{month}/preview", s.handleMonthPreview)
+	api("POST", "/api/months/{month}/close", s.handleCloseMonth)
+	api("POST", "/api/months/{month}/reopen", s.handleReopenMonth)
+
+	api("POST", "/api/chat", s.handleChat)
+	api("POST", "/api/actions/{id}/confirm", s.handleConfirmAction)
+	api("POST", "/api/actions/{id}/cancel", s.handleCancelAction)
+
 	mux.Handle("/", s.web)
-	return mux
+
+	// Header pengaman dipasang paling luar, lalu alert 5xx.
+	return s.securityHeaders(s.alertOnServerError(mux))
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		slog.Error("gagal menulis respons json", "error", err)
+// protect memastikan hanya request dengan sesi valid yang diteruskan.
+func (s *Server) protect(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.authConfigured(r.Context()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "login belum diaktifkan: isi APP_PASSWORD_HASH dan SESSION_SECRET di environment",
+			})
+			return
+		}
+		if !s.authenticated(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "sesi tidak valid, login dulu ya"})
+			return
+		}
+		s.refreshSession(w, r)
+		next(w, r)
 	}
 }

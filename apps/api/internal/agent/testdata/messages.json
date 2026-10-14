@@ -1,0 +1,17 @@
+[
+  { "message": "kopi 25rb", "tool": "add_transaction", "amount": 25000, "type": "expense", "note": "kopi" },
+  { "message": "makan siang 35000", "tool": "add_transaction", "amount": 35000, "type": "expense", "note": "makan siang" },
+  { "message": "gajian 5jt", "tool": "add_transaction", "amount": 5000000, "type": "income", "note": "gajian" },
+  { "message": "isi bensin 60rb", "tool": "add_transaction", "amount": 60000, "type": "expense", "note": "isi bensin" },
+  { "message": "gua minjem 200rb ke Budi", "tool": "add_debt", "amount": 200000, "person": "Budi", "direction": "hutang" },
+  { "message": "aku pinjam 150rb ke Sari", "tool": "add_debt", "amount": 150000, "person": "Sari", "direction": "hutang" },
+  { "message": "Budi minjem 150rb", "tool": "add_debt", "amount": 150000, "person": "Budi", "direction": "piutang" },
+  { "message": "Budi udah bayar 100rb", "tool": "add_debt_payment", "amount": 100000, "person": "Budi" },
+  { "message": "listrik udah dibayar", "tool": "mark_need_paid", "note": "listrik" },
+  { "message": "internet sudah dibayar 350rb", "tool": "mark_need_paid", "note": "internet", "amount": 350000 },
+  { "message": "sisa budget makan berapa?", "tool": "get_budget_remaining", "category": "makan" },
+  { "message": "bulan ini boros di mana?", "tool": "get_summary" },
+  { "message": "tutup bulan", "tool": "close_month" },
+  { "message": "halo anabul", "tool": "" },
+  { "message": "kopi", "tool": "" }
+]

@@ -23,6 +23,12 @@ type AgentLog struct {
 	CreatedAt   pgtype.Timestamptz
 }
 
+type AppSetting struct {
+	Key       string
+	Value     string
+	UpdatedAt pgtype.Timestamptz
+}
+
 type Budget struct {
 	ID         int64
 	MonthStart pgtype.Date

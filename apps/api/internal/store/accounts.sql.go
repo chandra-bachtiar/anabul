@@ -22,6 +22,32 @@ func (q *Queries) CreateAccount(ctx context.Context, name string) (Account, erro
 	return i, err
 }
 
+const findAccountByName = `-- name: FindAccountByName :one
+SELECT id, name, created_at
+FROM accounts
+WHERE lower(name) = lower($1)
+`
+
+func (q *Queries) FindAccountByName(ctx context.Context, lower string) (Account, error) {
+	row := q.db.QueryRow(ctx, findAccountByName, lower)
+	var i Account
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	return i, err
+}
+
+const getAccount = `-- name: GetAccount :one
+SELECT id, name, created_at
+FROM accounts
+WHERE id = $1
+`
+
+func (q *Queries) GetAccount(ctx context.Context, id int64) (Account, error) {
+	row := q.db.QueryRow(ctx, getAccount, id)
+	var i Account
+	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
+	return i, err
+}
+
 const listAccounts = `-- name: ListAccounts :many
 SELECT id, name, created_at
 FROM accounts

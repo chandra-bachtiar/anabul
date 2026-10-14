@@ -7,6 +7,8 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCategory = `-- name: CreateCategory :one
@@ -22,6 +24,51 @@ type CreateCategoryParams struct {
 
 func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
 	row := q.db.QueryRow(ctx, createCategory, arg.Name, arg.Keywords)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Keywords,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteCategory = `-- name: DeleteCategory :exec
+DELETE FROM categories WHERE id = $1
+`
+
+func (q *Queries) DeleteCategory(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deleteCategory, id)
+	return err
+}
+
+const findCategoryByName = `-- name: FindCategoryByName :one
+SELECT id, name, keywords, created_at
+FROM categories
+WHERE lower(name) = lower($1)
+`
+
+func (q *Queries) FindCategoryByName(ctx context.Context, lower string) (Category, error) {
+	row := q.db.QueryRow(ctx, findCategoryByName, lower)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Keywords,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getCategory = `-- name: GetCategory :one
+SELECT id, name, keywords, created_at
+FROM categories
+WHERE id = $1
+`
+
+func (q *Queries) GetCategory(ctx context.Context, id int64) (Category, error) {
+	row := q.db.QueryRow(ctx, getCategory, id)
 	var i Category
 	err := row.Scan(
 		&i.ID,
@@ -61,4 +108,31 @@ func (q *Queries) ListCategories(ctx context.Context) ([]Category, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateCategory = `-- name: UpdateCategory :one
+UPDATE categories
+SET
+  name = COALESCE($1::text, name),
+  keywords = COALESCE($2::text[], keywords)
+WHERE id = $3
+RETURNING id, name, keywords, created_at
+`
+
+type UpdateCategoryParams struct {
+	Name     pgtype.Text
+	Keywords []string
+	ID       int64
+}
+
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {
+	row := q.db.QueryRow(ctx, updateCategory, arg.Name, arg.Keywords, arg.ID)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Keywords,
+		&i.CreatedAt,
+	)
+	return i, err
 }
