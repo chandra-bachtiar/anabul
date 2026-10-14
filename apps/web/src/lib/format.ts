@@ -121,6 +121,40 @@ export function labelTanggalPendek(iso: string | null): string {
 	return `${Number(match[3])} ${bulanPendek[Number(match[2]) - 1]}`;
 }
 
+/**
+ * Tanggal lokal dalam bentuk "YYYY-MM-DD" untuk input type="date".
+ * Tanpa argumen berarti hari ini; bisa juga dari ISO atau objek Date.
+ */
+export function tanggalInput(nilai?: string | Date): string {
+	const date = nilai === undefined ? new Date() : nilai instanceof Date ? nilai : new Date(nilai);
+	if (Number.isNaN(date.getTime())) return '';
+	const bulan = String(date.getMonth() + 1).padStart(2, '0');
+	const hari = String(date.getDate()).padStart(2, '0');
+	return `${date.getFullYear()}-${bulan}-${hari}`;
+}
+
+export function tanggalKemarin(): string {
+	return tanggalInput(new Date(Date.now() - 86_400_000));
+}
+
+/**
+ * Menggabungkan tanggal "YYYY-MM-DD" dengan jam dari ISO (atau waktu sekarang)
+ * menjadi RFC3339 yang dikirim ke server.
+ */
+export function isoDariTanggal(tanggal: string, jamSumber?: string): string {
+	const sumber = jamSumber ? new Date(jamSumber) : new Date();
+	const jam = Number.isNaN(sumber.getTime()) ? new Date() : sumber;
+	const hh = String(jam.getHours()).padStart(2, '0');
+	const mm = String(jam.getMinutes()).padStart(2, '0');
+	const ss = String(jam.getSeconds()).padStart(2, '0');
+	return new Date(`${tanggal}T${hh}:${mm}:${ss}`).toISOString();
+}
+
+/** Bulan "YYYY-MM" dari tanggal "YYYY-MM-DD". */
+export function bulanDariTanggal(tanggal: string): string {
+	return tanggal.slice(0, 7);
+}
+
 export function statusBudgetLabel(status: string): string {
 	switch (status) {
 		case 'ok':

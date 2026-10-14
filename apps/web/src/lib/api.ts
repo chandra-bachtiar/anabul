@@ -140,8 +140,12 @@ export const api = {
 		due_date?: string | null;
 	}) => request<Debt>('POST', '/api/debts', payload),
 	debt: (id: number) => request<Debt>('GET', `/api/debts/${id}`),
-	createDebtPayment: (id: number, amount: number, paid_at?: string) =>
-		request<Debt>('POST', `/api/debts/${id}/payments`, { amount, paid_at }),
+	createDebtPayment: (id: number, amount: number, recordTransaction = true, paid_at?: string) =>
+		request<Debt>('POST', `/api/debts/${id}/payments`, {
+			amount,
+			paid_at,
+			record_transaction: recordTransaction
+		}),
 
 	// Tutup bulan
 	months: () => request<{ closed_months: string[]; current_month: string }>('GET', '/api/months'),

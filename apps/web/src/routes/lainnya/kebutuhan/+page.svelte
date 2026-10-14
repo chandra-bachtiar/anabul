@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ApiError, api } from '#lib/api';
+	import Confetti from '#lib/components/Confetti.svelte';
 	import MoneyInput from '#lib/components/MoneyInput.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { bulanIni, formatRupiah, geserBulan, labelBulan, labelTanggalPendek } from '#lib/format';
+	import { getarRingan } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { Category, Need, RecurringNeed } from '#lib/types';
 
@@ -15,6 +17,7 @@
 	let memuat = $state(true);
 	let pesanError = $state('');
 	let memproses = $state(false);
+	let perayaan = $state(0);
 
 	let editor = $state<RecurringNeed | null>(null);
 	let tambahTerbuka = $state(false);
@@ -123,9 +126,12 @@
 		try {
 			if (item.status === 'paid') {
 				await api.unpayNeed(item.id);
+				getarRingan();
 				toast(`${item.name} dibuka lagi. Transaksi yang sudah dibuat tetap ada.`);
 			} else {
 				await api.payNeed(item.id, item.amount);
+				perayaan += 1;
+				getarRingan();
 				toast(`${item.name} ditandai lunas.`);
 			}
 			await muat();
@@ -140,6 +146,8 @@
 <svelte:head>
 	<title>Kebutuhan bulanan — ANABUL</title>
 </svelte:head>
+
+<Confetti trigger={perayaan} />
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-2">
@@ -183,7 +191,7 @@
 					message="Tambahkan template dulu (mis. listrik tanggal 5), lalu ketuk Siapkan dari template."
 				/>
 			{:else}
-				<ul class="space-y-2">
+				<ul class="anim-daftar space-y-2">
 					{#each kebutuhan as item (item.id)}
 						<li class="card bg-base-200">
 							<div class="card-body flex-row items-center justify-between gap-3 p-4">
@@ -211,7 +219,7 @@
 			{#if template.length === 0}
 				<StateBlock state="empty" title="Belum ada template" message="Template dipakai untuk menyiapkan daftar kebutuhan tiap awal bulan." />
 			{:else}
-				<ul class="space-y-2">
+				<ul class="anim-daftar space-y-2">
 					{#each template as item (item.id)}
 						<li class="card bg-base-200">
 							<div class="card-body gap-2 p-4">

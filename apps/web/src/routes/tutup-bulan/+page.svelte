@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ApiError, api } from '#lib/api';
+	import Confetti from '#lib/components/Confetti.svelte';
 	import Mascot from '#lib/components/Mascot.svelte';
 	import Progress from '#lib/components/Progress.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { bulanIni, formatRupiah, geserBulan, labelBulan, labelTanggalPendek } from '#lib/format';
+	import { getarSenang } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { MonthPreview, Snapshot } from '#lib/types';
 
@@ -16,6 +18,7 @@
 	let memproses = $state(false);
 	let konfirmasiTerbuka = $state(false);
 	let hasil = $state<Snapshot | null>(null);
+	let perayaan = $state(0);
 
 	async function muat() {
 		memuat = true;
@@ -42,6 +45,8 @@
 		try {
 			hasil = await api.closeMonth(bulan);
 			konfirmasiTerbuka = false;
+			perayaan += 1;
+			getarSenang();
 			toast(`Bulan ${labelBulan(bulan)} sudah ditutup.`);
 			await muat();
 		} catch (error) {
@@ -68,6 +73,8 @@
 <svelte:head>
 	<title>Tutup bulan — ANABUL</title>
 </svelte:head>
+
+<Confetti trigger={perayaan} />
 
 <div class="space-y-4">
 	<h1 class="font-display text-2xl font-semibold">Tutup bulan</h1>

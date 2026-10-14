@@ -7,6 +7,7 @@
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { bulanIni, formatRupiah, geserBulan, labelBulan, statusBudgetLabel } from '#lib/format';
+	import { getarRingan } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { BudgetRow, Category } from '#lib/types';
 
@@ -83,6 +84,7 @@
 		try {
 			await api.saveBudgets(bulan, [{ category_id: dipilih.id, amount: nominal }]);
 			dipilih = null;
+			getarRingan();
 			toast(nominal === 0 ? 'Budget kategori itu dikosongkan.' : 'Budget tersimpan.');
 			await muat();
 		} catch (error) {

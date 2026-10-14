@@ -1,10 +1,12 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import BottomNav from '#lib/components/BottomNav.svelte';
 	import Toasts from '#lib/components/Toasts.svelte';
+	import { bolehBergerak } from '#lib/haptic';
 	import { checkSession, session } from '#lib/session.svelte';
 	import { initTheme } from '#lib/theme.svelte';
 	import type { LayoutProps } from './$types';
@@ -13,6 +15,7 @@
 
 	const jalur = $derived(page.url.pathname);
 	const diLogin = $derived(jalur === '/login');
+	const durasiPindah = $derived(bolehBergerak() ? 180 : 0);
 
 	onMount(() => {
 		initTheme();
@@ -40,7 +43,12 @@
 				<p class="text-sm opacity-70">Menyiapkan ANABUL...</p>
 			</div>
 		{:else}
-			{@render children()}
+			<!-- Halaman berganti dengan lembut supaya tidak terasa kaku. -->
+			{#key jalur}
+				<div in:fade={{ duration: durasiPindah }}>
+					{@render children()}
+				</div>
+			{/key}
 		{/if}
 	</main>
 </div>

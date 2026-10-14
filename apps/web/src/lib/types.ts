@@ -89,6 +89,8 @@ export interface Debt {
 	status: 'open' | 'settled';
 	overdue: boolean;
 	created_at: string;
+	payment_count: number;
+	last_payment_at: string | null;
 	payments?: DebtPayment[];
 }
 

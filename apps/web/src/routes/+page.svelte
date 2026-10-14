@@ -8,6 +8,8 @@
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { onChatChange } from '#lib/chat.svelte';
+	import Confetti from '#lib/components/Confetti.svelte';
+	import { getarRingan } from '#lib/haptic';
 	import { session } from '#lib/session.svelte';
 	import {
 		bulanIni,
@@ -28,6 +30,7 @@
 
 	let perluDibayar = $state<Need | null>(null);
 	let nominalBayar = $state(0);
+	let perayaan = $state(0);
 
 	async function muat() {
 		memuat = true;
@@ -63,6 +66,8 @@
 		perluDibayar = null;
 		try {
 			await api.payNeed(need.id, nominalBayar);
+			perayaan += 1;
+			getarRingan();
 			toast(`${need.name} ditandai lunas dan masuk pengeluaran.`);
 			await muat();
 		} catch (error) {
@@ -175,9 +180,11 @@
 				<div class="flex items-start justify-between gap-3">
 					<div>
 						<h2 id="judul-budget" class="text-sm font-semibold opacity-70">Sisa budget bulan ini</h2>
-						<p class="font-display text-4xl leading-tight font-semibold tabular-nums">
-							{formatRupiah(data.budget_remaining)}
-						</p>
+						{#key data.budget_remaining}
+							<p class="anim-pop font-display text-4xl leading-tight font-semibold tabular-nums">
+								{formatRupiah(data.budget_remaining)}
+							</p>
+						{/key}
 					</div>
 					{#if data.budget_status === 'warn' || data.budget_status === 'over'}
 						<Mascot mood="khawatir" size={64} />
@@ -247,7 +254,7 @@
 					</div>
 				</div>
 			{:else}
-				<ul class="space-y-2">
+				<ul class="anim-daftar space-y-2">
 					{#each data.needs as need (need.id)}
 						<li>
 							<button
@@ -334,7 +341,7 @@
 					message={'Ketik "kopi 25rb" di kolom obrolan bawah, nanti ANABUL catat sendiri.'}
 				/>
 			{:else}
-				<ul class="space-y-2">
+				<ul class="anim-daftar space-y-2">
 					{#each data.recent as transaksi (transaksi.id)}
 						<li class="card bg-base-200">
 							<div class="card-body flex-row items-center justify-between gap-3 p-4">
@@ -364,6 +371,8 @@
 
 	<ChatPanel />
 </div>
+
+<Confetti trigger={perayaan} />
 
 <Sheet
 	open={perluDibayar !== null}

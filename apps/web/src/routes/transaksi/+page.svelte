@@ -5,7 +5,19 @@
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { onChatChange } from '#lib/chat.svelte';
-	import { bulanIni, formatRupiah, geserBulan, labelBulan, labelHari, labelJam } from '#lib/format';
+	import { getarRingan } from '#lib/haptic';
+	import {
+		bulanDariTanggal,
+		bulanIni,
+		formatRupiah,
+		geserBulan,
+		isoDariTanggal,
+		labelBulan,
+		labelHari,
+		labelJam,
+		tanggalInput,
+		tanggalKemarin
+	} from '#lib/format';
 	import { toast } from '#lib/toast.svelte';
 	import type { Account, Category, Transaction } from '#lib/types';
 
@@ -22,11 +34,25 @@
 	let filterKategori = $state<number | 0>(0);
 
 	let editor = $state<Transaction | null>(null);
-	let form = $state({ type: 'expense', amount: 0, note: '', category_id: 0, account_id: 0 });
+	let form = $state({
+		type: 'expense',
+		amount: 0,
+		note: '',
+		category_id: 0,
+		account_id: 0,
+		tanggal: tanggalInput()
+	});
 	let simpanProses = $state(false);
 
 	let tambahTerbuka = $state(false);
-	let formBaru = $state({ type: 'expense', amount: 0, note: '', category_id: 0, account_id: 0 });
+	let formBaru = $state({
+		type: 'expense',
+		amount: 0,
+		note: '',
+		category_id: 0,
+		account_id: 0,
+		tanggal: tanggalInput()
+	});
 
 	async function muat() {
 		memuat = true;
@@ -115,8 +141,20 @@
 			amount: transaksi.amount,
 			note: transaksi.note,
 			category_id: transaksi.category_id ?? 0,
-			account_id: transaksi.account_id ?? 0
+			account_id: transaksi.account_id ?? 0,
+			tanggal: tanggalInput(transaksi.occurred_at)
 		};
+	}
+
+	// Catatan yang tanggalnya pindah bulan tidak akan terlihat di daftar bulan
+	// yang sedang dibuka, jadi pemakai diberi tahu tujuannya ke mana.
+	function beriTahuPindahBulan(tanggal: string) {
+		const bulanTujuan = bulanDariTanggal(tanggal);
+		if (bulanTujuan !== bulan) {
+			toast(`Tersimpan di ${labelBulan(bulanTujuan)}.`);
+			return true;
+		}
+		return false;
 	}
 
 	async function simpanEdit() {
@@ -130,10 +168,14 @@
 				category_id: form.category_id || null,
 				account_id: form.account_id || null,
 				clear_category: form.category_id === 0,
-				clear_account: form.account_id === 0
+				clear_account: form.account_id === 0,
+				// Jam aslinya dipertahankan, yang berubah hanya tanggalnya.
+				occurred_at: isoDariTanggal(form.tanggal, editor.occurred_at)
 			});
+			const pindahBulan = beriTahuPindahBulan(form.tanggal);
 			editor = null;
-			toast('Perubahan tersimpan.');
+			getarRingan();
+			if (!pindahBulan) toast('Perubahan tersimpan.');
 			await muat();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan perubahan.', 'error');
@@ -153,6 +195,24 @@
 		}
 	}
 
+	// Saat sedang melihat bulan lain, tanggal awal diarahkan ke bulan itu supaya
+	// catatan baru tidak diam-diam masuk ke bulan sekarang.
+	function tanggalAwal() {
+		return bulan === bulanIni() ? tanggalInput() : `${bulan}-01`;
+	}
+
+	function bukaTambah() {
+		formBaru = {
+			type: 'expense',
+			amount: 0,
+			note: '',
+			category_id: 0,
+			account_id: 0,
+			tanggal: tanggalAwal()
+		};
+		tambahTerbuka = true;
+	}
+
 	async function tambah() {
 		simpanProses = true;
 		try {
@@ -161,11 +221,21 @@
 				amount: formBaru.amount,
 				note: formBaru.note,
 				category_id: formBaru.category_id || null,
-				account_id: formBaru.account_id || null
+				account_id: formBaru.account_id || null,
+				occurred_at: isoDariTanggal(formBaru.tanggal)
 			});
+			const pindahBulan = beriTahuPindahBulan(formBaru.tanggal);
 			tambahTerbuka = false;
-			formBaru = { type: 'expense', amount: 0, note: '', category_id: 0, account_id: 0 };
-			toast('Catatan baru tersimpan.');
+			formBaru = {
+				type: 'expense',
+				amount: 0,
+				note: '',
+				category_id: 0,
+				account_id: 0,
+				tanggal: tanggalAwal()
+			};
+			getarRingan();
+			if (!pindahBulan) toast('Catatan baru tersimpan.');
 			await muat();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan catatan.', 'error');
@@ -182,7 +252,7 @@
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="font-display text-2xl font-semibold">Transaksi</h1>
-		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={() => (tambahTerbuka = true)}>
+		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={bukaTambah}>
 			Tambah manual
 		</button>
 	</header>
@@ -230,14 +300,14 @@
 			title="Belum ada transaksi di bulan ini"
 			message="Coba ganti bulan, ubah filter, atau catat lewat obrolan di Home."
 			actionLabel="Tambah manual"
-			onaction={() => (tambahTerbuka = true)}
+			onaction={bukaTambah}
 		/>
 	{:else}
 		<div class="space-y-4">
 			{#each kelompok as grup (grup.judul)}
 				<section aria-label={grup.judul}>
 					<h2 class="mb-2 text-xs font-semibold tracking-wide uppercase opacity-70">{grup.judul}</h2>
-					<ul class="space-y-2">
+					<ul class="anim-daftar space-y-2">
 						{#each grup.items as transaksi (transaksi.id)}
 							<li class="card bg-base-200">
 								<button
@@ -303,6 +373,22 @@
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="edit-nominal">Nominal</label>
 			<MoneyInput id="edit-nominal" value={form.amount} onchange={(value) => (form.amount = value)} />
+		</div>
+
+		<div>
+			<label class="label pb-1 text-sm font-semibold" for="edit-tanggal">Tanggal catatan</label>
+			<input id="edit-tanggal" type="date" class="input input-bordered min-h-11 w-full" bind:value={form.tanggal} required />
+			<div class="mt-2 flex flex-wrap gap-2">
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.tanggal = tanggalInput())}>
+					Hari ini
+				</button>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.tanggal = tanggalKemarin())}>
+					Kemarin
+				</button>
+			</div>
+			<p class="mt-2 text-xs opacity-70">
+				Jamnya tetap seperti semula, yang berubah hanya tanggalnya.
+			</p>
 		</div>
 
 		<div>
@@ -372,6 +458,22 @@
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="baru-nominal">Nominal</label>
 			<MoneyInput id="baru-nominal" value={formBaru.amount} onchange={(value) => (formBaru.amount = value)} required />
+		</div>
+
+		<div>
+			<label class="label pb-1 text-sm font-semibold" for="baru-tanggal">Tanggal catatan</label>
+			<input id="baru-tanggal" type="date" class="input input-bordered min-h-11 w-full" bind:value={formBaru.tanggal} required />
+			<div class="mt-2 flex flex-wrap gap-2">
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (formBaru.tanggal = tanggalInput())}>
+					Hari ini
+				</button>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (formBaru.tanggal = tanggalKemarin())}>
+					Kemarin
+				</button>
+			</div>
+			<p class="mt-2 text-xs opacity-70">
+				Lupa nyatat kemarin? Pilih tanggalnya di sini, catatannya masuk ke hari itu.
+			</p>
 		</div>
 
 		<div>

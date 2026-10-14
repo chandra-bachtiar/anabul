@@ -146,3 +146,119 @@ html {
 .textarea {
 	border-color: var(--color-outline-warm);
 }
+
+/* Animasi ringan: transisi halaman, kartu yang baru muncul, umpan balik tekan,
+   dan konfeti saat momen senang. Semuanya berhenti kalau pengguna meminta
+   kurangi gerak. */
+@keyframes anabul-naik {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes anabul-pop {
+	0% {
+		transform: scale(0.94);
+	}
+	60% {
+		transform: scale(1.03);
+	}
+	100% {
+		transform: none;
+	}
+}
+
+@keyframes anabul-konfeti-jatuh {
+	0% {
+		opacity: 0;
+		transform: translateY(-12px) scale(0.6);
+	}
+	20% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translateY(var(--jatuh, 160px)) rotate(var(--putar, 360deg));
+	}
+}
+
+@keyframes anabul-denyut {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+.anim-naik {
+	animation: anabul-naik 0.26s ease-out both;
+}
+
+.anim-pop {
+	animation: anabul-pop 0.32s ease-out;
+}
+
+.anabul-konfeti {
+	animation: anabul-konfeti-jatuh 1.4s ease-in forwards;
+}
+
+/* Baris daftar muncul berurutan sedikit supaya tidak kaku. */
+.anim-daftar > * {
+	animation: anabul-naik 0.24s ease-out both;
+}
+.anim-daftar > *:nth-child(2) {
+	animation-delay: 30ms;
+}
+.anim-daftar > *:nth-child(3) {
+	animation-delay: 60ms;
+}
+.anim-daftar > *:nth-child(4) {
+	animation-delay: 90ms;
+}
+.anim-daftar > *:nth-child(5) {
+	animation-delay: 120ms;
+}
+
+/* Sheet dan kartu terasa hidup saat disentuh. */
+.modal-box {
+	animation: anabul-naik 0.22s ease-out;
+}
+
+.btn:active:not(:disabled) {
+	transform: scale(0.97);
+}
+
+.card-mengambang {
+	transition:
+		transform 0.18s ease-out,
+		background-color 0.18s ease-out;
+}
+.card-mengambang:hover {
+	transform: translateY(-2px);
+}
+
+.skeleton {
+	animation: anabul-denyut 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.anim-naik,
+	.anim-pop,
+	.anabul-konfeti,
+	.anim-daftar > *,
+	.modal-box,
+	.skeleton {
+		animation: none !important;
+	}
+	.btn:active:not(:disabled),
+	.card-mengambang:hover {
+		transform: none;
+	}
+}

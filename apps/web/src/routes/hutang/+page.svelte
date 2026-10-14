@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ApiError, api } from '#lib/api';
+	import Confetti from '#lib/components/Confetti.svelte';
 	import MoneyInput from '#lib/components/MoneyInput.svelte';
 	import Progress from '#lib/components/Progress.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { formatRupiah, labelTanggal, labelTanggalPendek } from '#lib/format';
+	import { getarRingan, getarSenang } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { Debt, DebtTotals } from '#lib/types';
 
@@ -18,7 +20,9 @@
 
 	let detail = $state<Debt | null>(null);
 	let nominalBayar = $state(0);
+	let catatTransaksi = $state(true);
 	let memproses = $state(false);
+	let perayaan = $state(0);
 
 	let tambahTerbuka = $state(false);
 	let formBaru = $state({ person: '', amount: 0, note: '', due_date: '' });
@@ -45,6 +49,7 @@
 		try {
 			detail = await api.debt(id);
 			nominalBayar = detail.remaining;
+			catatTransaksi = true;
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal membuka rincian.', 'error');
 		}
@@ -52,12 +57,33 @@
 
 	async function bayar() {
 		if (!detail) return;
+		const orang = detail.person;
+		const ikutDicatat = catatTransaksi;
+		const hutang = detail.direction === 'hutang';
 		memproses = true;
 		try {
-			const hasil = await api.createDebtPayment(detail.id, nominalBayar);
-			detail = hasil;
-			nominalBayar = hasil.remaining;
-			toast(hasil.status === 'settled' ? `${hasil.person} sudah lunas. Meong!` : 'Pembayaran tercatat.');
+			const hasil = await api.createDebtPayment(detail.id, nominalBayar, ikutDicatat);
+
+			// Form ditutup setelah tersimpan; sisanya bisa dilihat lagi dari
+			// kartu (jumlah bayar dan tanggal terakhir) atau dengan membuka
+			// rinciannya kembali.
+			detail = null;
+			nominalBayar = 0;
+
+			const catatan = ikutDicatat
+				? hutang
+					? ' Masuk pengeluaran bulan ini.'
+					: ' Masuk pemasukan bulan ini.'
+				: ' Tidak masuk catatan harian.';
+
+			if (hasil.status === 'settled') {
+				perayaan += 1;
+				getarSenang();
+				toast(`${orang} sudah lunas. Meong!${catatan}`, 'ok', 6000);
+			} else {
+				getarRingan();
+				toast(`Pembayaran ${orang} tercatat. Sisa ${formatRupiah(hasil.remaining)}.${catatan}`, 'ok', 5000);
+			}
 			await muat();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal mencatat pembayaran.', 'error');
@@ -78,6 +104,7 @@
 			});
 			tambahTerbuka = false;
 			formBaru = { person: '', amount: 0, note: '', due_date: '' };
+			getarRingan();
 			toast(arah === 'hutang' ? 'Hutang baru dicatat.' : 'Piutang baru dicatat.');
 			await muat();
 		} catch (error) {
@@ -85,6 +112,12 @@
 		} finally {
 			memproses = false;
 		}
+	}
+
+	function statusJatuhTempo(item: Debt): string {
+		if (item.status === 'settled') return 'Lunas';
+		if (!item.due_date) return 'Tanpa jatuh tempo';
+		return `${item.overdue ? 'Telat sejak' : 'Jatuh tempo'} ${labelTanggalPendek(item.due_date)}`;
 	}
 </script>
 
@@ -139,12 +172,12 @@
 			onaction={() => (tambahTerbuka = true)}
 		/>
 	{:else}
-		<ul class="space-y-2">
+		<ul class="anim-daftar space-y-2">
 			{#each terlihat as item (item.id)}
-				<li class="card bg-base-200">
+				<li class="card card-mengambang bg-base-200">
 					<button
 						type="button"
-						class="w-full rounded-box text-left transition-colors hover:bg-base-300/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+						class="w-full rounded-box text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
 						onclick={() => void bukaDetail(item.id)}
 					>
 						<div class="card-body gap-2 p-4">
@@ -166,14 +199,17 @@
 							/>
 
 							<p class="text-xs {item.overdue ? 'font-semibold text-error-ink' : 'opacity-70'}">
-								{#if item.status === 'settled'}
-									Lunas
-								{:else if item.due_date}
-									{item.overdue ? 'Telat sejak' : 'Jatuh tempo'} {labelTanggalPendek(item.due_date)}
+								{statusJatuhTempo(item)}
+							</p>
+
+							<p class="text-xs opacity-70">
+								{#if item.payment_count > 0}
+									{item.payment_count}x bayar
+									{#if item.last_payment_at}· terakhir {labelTanggalPendek(item.last_payment_at)}{/if}
+									· total {formatRupiah(item.paid)} dari {formatRupiah(item.amount_total)}
 								{:else}
-									Tanpa jatuh tempo
+									Belum ada pembayaran · ketuk untuk lihat riwayat dan catat bayar
 								{/if}
-								· Dibayar {formatRupiah(item.paid)} dari {formatRupiah(item.amount_total)}
 							</p>
 						</div>
 					</button>
@@ -182,6 +218,8 @@
 		</ul>
 	{/if}
 </div>
+
+<Confetti trigger={perayaan} />
 
 <Sheet
 	open={detail !== null}
@@ -210,19 +248,28 @@
 				<p class="text-sm opacity-80">Jatuh tempo {labelTanggal(detail.due_date)}</p>
 			{/if}
 
-			{#if detail.payments && detail.payments.length > 0}
-				<div>
-					<h3 class="mb-2 text-sm font-semibold">Riwayat pembayaran</h3>
-					<ul class="space-y-1 text-sm">
-						{#each detail.payments as bayarItem (bayarItem.id)}
+			<div>
+				<h3 class="mb-2 flex items-baseline justify-between gap-2 text-sm font-semibold">
+					<span>Riwayat pembayaran</span>
+					<span class="tabular-nums opacity-70">{detail.payment_count}x · {formatRupiah(detail.paid)}</span>
+				</h3>
+				{#if detail.payments && detail.payments.length > 0}
+					<ul class="anim-daftar space-y-1 text-sm">
+						{#each detail.payments as bayarItem, index (bayarItem.id)}
 							<li class="flex items-baseline justify-between gap-3 rounded-xl bg-base-300/40 px-3 py-2">
-								<span>{labelTanggal(bayarItem.paid_at)}</span>
-								<span class="tabular-nums">{formatRupiah(bayarItem.amount)}</span>
+								<span class="opacity-70">
+									{#if index === 0}Terakhir · {/if}{labelTanggal(bayarItem.paid_at)}
+								</span>
+								<span class="tabular-nums font-medium">{formatRupiah(bayarItem.amount)}</span>
 							</li>
 						{/each}
 					</ul>
-				</div>
-			{/if}
+				{:else}
+					<p class="rounded-xl bg-base-300/40 px-3 py-2 text-sm opacity-70">
+						Belum ada pembayaran tercatat. Setiap cicilan yang kamu simpan akan muncul di sini.
+					</p>
+				{/if}
+			</div>
 
 			{#if detail.status !== 'settled'}
 				<form
@@ -236,6 +283,19 @@
 						<label class="label pb-1 text-sm font-semibold" for="nominal-bayar-hutang">Nominal pembayaran</label>
 						<MoneyInput id="nominal-bayar-hutang" value={nominalBayar} onchange={(value) => (nominalBayar = value)} />
 					</div>
+
+					<label class="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-base-300 px-3 py-2">
+						<input type="checkbox" class="checkbox mt-1" bind:checked={catatTransaksi} />
+						<span class="text-sm">
+							Catat juga di buku harian
+							<span class="block text-xs opacity-70">
+								{detail.direction === 'hutang'
+									? 'Uang yang keluar dihitung sebagai pengeluaran bulan ini.'
+									: 'Uang yang diterima dihitung sebagai pemasukan bulan ini.'}
+							</span>
+						</span>
+					</label>
+
 					<div class="flex justify-end gap-2">
 						<button type="button" class="btn btn-ghost min-h-11" onclick={() => (nominalBayar = detail?.remaining ?? 0)}>
 							Isi sisa penuh
