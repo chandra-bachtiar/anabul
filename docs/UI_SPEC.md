@@ -44,6 +44,35 @@ Ini versi awal buatan AI (SVG vektor, mudah diubah). Boleh diganti ilustrasi fin
 
 Catatan: teks di atas tombol oranye memakai `--ink` (gelap), bukan putih, supaya kontras cukup. Cek kontras sebenarnya saat implementasi (target WCAG AA). Mode dark didukung dan mengikuti sistem, dapat diganti di Pengaturan.
 
+### Token turunan untuk teks (hasil audit kontras)
+
+Warna di tabel atas dipilih untuk permukaan dan isian, bukan untuk teks di atas krem/putih.
+Saat implementasi ditambahkan turunannya supaya semua teks lolos WCAG AA (4,5:1):
+
+| Token | Light | Dark | Alasan |
+|---|---|---|---|
+| `--primary-ink` | `#B8531A` | `#FFC178` | oranye primary hanya 2,6:1 di atas krem |
+| `--success-ink` | `#197A53` | `#5ED6A4` | mint terang hanya 2,2:1 di atas putih |
+| `--error-ink` | `#C02A3E` | `#FF8F9F` | merah terang hanya 3,4:1 di atas putih |
+| `--outline-warm` | `#8B6F5E` | `#8B6F5E` | batas input butuh 3:1 (WCAG 1.4.11) |
+
+Warna terang aslinya tetap dipakai untuk isian progress dan latar, karena di sana
+yang dinilai adalah bentuk, bukan teks, dan angkanya selalu didampingi teks.
+
+### Arah desain saat mengerjakan UI
+
+Reading as: aplikasi keuangan pribadi untuk satu pemilik, dipakai di HP, dengan bahasa
+visual hangat dan playful ala maskot kucing, dial **ENERGY 2 / RHYTHM 2 / MOTION 1**.
+
+- ENERGY 2: maskot, oranye hangat, dan bentuk membulat memberi karakter, tapi angka tetap fokus utama.
+- RHYTHM 2: kartu sisa budget sengaja paling menonjol di Home; bagian lain menyusul dengan bobot lebih kecil.
+- MOTION 1: hanya umpan balik interaksi (tekan, fokus, isian progress). Tidak ada animasi dekoratif.
+
+Motif identitas: atap rumah dengan dua telinga kucing pada ikon navigasi Home, dan mood
+maskot yang mengikuti kondisi budget. Ikon navigasi digambar sendiri dalam satu bahasa
+bentuk (garis 1,8px, ujung membulat) supaya tidak terbaca sebagai set ikon bawaan dan
+serasi dengan bentuk maskot.
+
 ## Tipografi dan bentuk
 - Font membulat yang ramah: **Nunito** (isi) dan **Fredoka** atau **Baloo 2** (judul/angka besar). Self-host `woff2` (tanpa CDN) supaya PWA bisa offline dan sesuai CSP. Verifikasi dukungan angka tabular; kalau kurang rapi, pakai angka dari font fallback.
 - Radius besar (`rounded-2xl`/`3xl`), bayangan lembut, tombol "pill". Boleh border tipis hangat; hindari border hitam tebal ala neobrutalism.
@@ -74,9 +103,10 @@ Bilah input chat tersedia di Home dan dapat dibuka dari tab lain lewat tombol me
 2. **Transaksi**: daftar per hari (kartu), filter bulan/kategori, pencarian, tap untuk edit/hapus, tombol tambah manual.
 3. **Budget**: pilih bulan, kategori dengan budget/terpakai/sisa/progress, edit nominal, "salin dari bulan lalu".
 4. **Hutang**: dua segmen (Hutang saya / Piutang saya); kartu per orang dengan sisa, jatuh tempo, riwayat bayar; tombol catat pembayaran.
-5. **Lainnya**: Kebutuhan bulanan, Tutup bulan, Kategori & akun, Pengaturan (tema, logout).
+5. **Lainnya**: Kebutuhan bulanan, Tutup bulan, Kategori & akun, Pengaturan (tema, ganti password, logout).
 6. **Tutup bulan** (alur khusus): pratinjau ringkasan -> cek akhir (kebutuhan belum dibayar, hutang jatuh tempo) -> konfirmasi -> hasil snapshot. Bulan tertutup memunculkan lencana "Terkunci" (maskot tidur) dan tombol "Buka kembali" dengan konfirmasi.
 7. **Login**: satu input password, maskot menyapa.
+8. **Pengaturan - Ganti password**: password sekarang, password baru, dan ulangan; aturan minimal 8 karakter ditulis apa adanya. Selama password masih `anabul123`, Home menampilkan kartu saran ganti (maskot khawatir) yang mengarah ke bagian ini, dan login pertama juga menyisipkan satu toast pengingat. Setelah diganti, kartu itu hilang sendiri.
 
 ## Empty/error state
 - Daftar kosong: maskot tidur + ajakan aksi singkat.

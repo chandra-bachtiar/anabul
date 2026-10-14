@@ -61,6 +61,11 @@ TZ=Asia/Jakarta
 DATABASE_URL=postgres://app:app@localhost:5432/finance?sslmode=disable
 APP_PASSWORD_HASH=
 SESSION_SECRET=
+SESSION_SECRET_PREVIOUS=
+TRUST_PROXY=false
+ALERT_WEBHOOK_URL=
+PUBLIC_URL=
+DOMAIN=
 LLM_BASE_URL=https://api.openai.com/v1
 LLM_API_KEY=
 LLM_MODEL=gpt-4o-mini
@@ -69,14 +74,57 @@ TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_OWNER_CHAT_ID=
 ```
 
+Makna tambahan: `SESSION_SECRET_PREVIOUS` menerima cookie yang ditandatangani secret lama
+saat rotasi, `TRUST_PROXY` mengizinkan header `X-Forwarded-*` dipakai (cookie `Secure` dan
+rate limit per IP asli), `ALERT_WEBHOOK_URL` menerima notifikasi 5xx dan kegagalan start,
+`PUBLIC_URL`/`DOMAIN` dipakai `make webhook` dan compose produksi.
+
+## Database
+Aplikasi tidak menyimpan state di container, semuanya di PostgreSQL yang ditunjuk
+`DATABASE_URL`. Tiga pilihan yang didukung:
+
+| Pilihan | Kapan dipakai | Catatan |
+|---|---|---|
+| Neon (hosted) | pemakaian sehari-hari | wajib `sslmode=require`; host `-pooler` otomatis memakai mode query tanpa prepared statement |
+| Postgres terpasang di mesin | paling cepat, tanpa container | backup manual |
+| `docker compose up -d postgres` | ngoprek dan uji migrasi dari DB kosong | data di volume `pgdata` |
+
+Pindah penyedia cukup mengganti `DATABASE_URL`; tidak ada kode yang perlu diubah.
+Migrasi goose dijalankan otomatis saat server start (dan lewat `make migrate`), jadi
+database baru tidak butuh langkah manual. Saat database belum siap (container baru
+naik atau Neon baru bangun dari idle), server menunggu sampai 10 percobaan ping
+sebelum menyerah.
+
 ## Build dan deploy
 Dockerfile multi-stage:
 1. `node` : `npm ci && npm run build` (output statis)
 2. `golang` : salin hasil build ke `apps/api/internal/webui/dist`, `CGO_ENABLED=0 go build`
 3. `distroless/static:nonroot` : hanya binary (migrasi `goose` di-embed ke binary)
 
-Nama image: `anabul`. Image stateless; state hanya di PostgreSQL (lokal via compose atau hosted seperti Neon, cukup ganti `DATABASE_URL`). Webhook Telegram butuh HTTPS publik (reverse proxy seperti Caddy/Traefik atau tunnel). Pastikan versi base image dicek ulang saat implementasi.
+Nama image: `anabul`. Image stateless; state hanya di PostgreSQL (lokal via compose atau hosted seperti Neon, cukup ganti `DATABASE_URL`). Karena database tidak lagi ikut
+container, `docker run` cukup diberi `--env-file .env`. Webhook Telegram butuh HTTPS publik (reverse proxy seperti Caddy/Traefik atau tunnel). Pastikan versi base image dicek ulang saat implementasi.
 
 ## Observabilitas dan backup
 - Log terstruktur (`slog`), tabel `agent_logs` untuk jejak agent
-- Backup: `pg_dump` terjadwal jika DB self-hosted; jika hosted, gunakan fitur restore penyedia
+- Header pengaman di semua respons: CSP (skrip inline SvelteKit diizinkan lewat hash yang
+  dihitung dari `index.html` saat start), `X-Content-Type-Options`, `Referrer-Policy`,
+  `frame-ancestors 'none'`, `Permissions-Policy`
+- `ALERT_WEBHOOK_URL` mengirim pesan singkat saat ada respons 5xx atau server gagal start,
+  dengan penahanan 5 menit untuk pesan yang sama
+- Backup: `make backup` menjalankan `pg_dump` dari container `postgres:16-alpine` dan
+  menyimpan hasil gzip di `backups/` (retensi `BACKUP_KEEP`, default 14). `make restore`
+  mengembalikannya lewat `psql`. Keduanya membaca `DATABASE_URL` dari environment atau
+  `.env`, dan otomatis mengganti host `localhost` menjadi `host.docker.internal` karena
+  kliennya berjalan di container
+- Backup terjadwal: cron (Linux/macOS) atau Task Scheduler (Windows), contohnya di README.
+  Di Neon, point-in-time recovery tetap disediakan penyedia
+
+## Deploy dengan HTTPS
+`docker-compose.prod.yml` menjalankan dua service: `app` (image `anabul`, tanpa port publik)
+dan `caddy` (port 80/443, sertifikat Let's Encrypt otomatis, HSTS). Container app diberi
+`TRUST_PROXY=true` agar cookie sesi ditandai `Secure` dan rate limit memakai IP asli.
+
+Untuk uji lokal dipakai `deploy/Caddyfile.local` dengan `tls internal` di port 8443
+(sertifikat self-signed). Webhook Telegram didaftarkan lewat `make webhook`, yang memanggil
+`setWebhook` dengan `secret_token` dan membatasi `allowed_updates` ke pesan saja; status
+webhook bisa dilihat dengan `make telegram-info`.

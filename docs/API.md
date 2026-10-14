@@ -3,12 +3,15 @@
 Semua di bawah `/api`, JSON, butuh cookie sesi kecuali disebut lain. Bulan memakai format `YYYY-MM`. Nominal integer rupiah. Error: `{ "error": "pesan" }` dengan status HTTP yang sesuai.
 
 ## Auth
-- `POST /api/auth/login` `{ password }` -> set cookie sesi
+- `POST /api/auth/login` `{ password }` -> set cookie sesi, plus `using_default_password` supaya UI bisa menyarankan ganti password
 - `POST /api/auth/logout`
+- `GET /api/auth/me` -> `{ authenticated, configured, using_default_password }`, dipakai frontend untuk memutuskan tampil halaman login dan saran ganti password
+- `POST /api/auth/password` `{ current_password, new_password }` -> ganti password (minimal 8 karakter, tidak boleh sama dengan yang sekarang atau dengan password default)
 - `GET /healthz` (tanpa auth)
 
 ## Dashboard
 - `GET /api/dashboard?month=YYYY-MM` -> total income/expense, sisa budget per kategori, 5 transaksi terakhir, kebutuhan belum dibayar, ringkasan hutang piutang
+- `GET /api/summary?month=YYYY-MM` -> ringkasan angka saja (dipakai halaman tutup bulan dan agent)
 
 ## Transaksi
 - `GET /api/transactions?month=&category_id=&q=&cursor=`
@@ -29,7 +32,9 @@ Semua di bawah `/api`, JSON, butuh cookie sesi kecuali disebut lain. Bulan memak
 ## Kebutuhan bulanan
 - `GET/POST /api/recurring-needs`, `PATCH/DELETE /api/recurring-needs/:id`
 - `GET /api/needs?month=`
+- `POST /api/needs/generate` `{ month? }` -> siapkan daftar kebutuhan bulan itu dari template
 - `POST /api/needs/:id/pay` -> tandai paid + buat transaksi
+- `POST /api/needs/:id/unpay` -> batalkan status lunas (transaksi yang sudah dibuat tetap ada)
 
 ## Hutang piutang
 - `GET /api/debts?status=` -> beserta sisa
@@ -38,6 +43,7 @@ Semua di bawah `/api`, JSON, butuh cookie sesi kecuali disebut lain. Bulan memak
 - `GET /api/debts/:id`
 
 ## Tutup bulan
+- `GET /api/months` -> daftar bulan yang sedang terkunci + bulan berjalan
 - `GET /api/months/:month/preview` -> ringkasan sebelum ditutup
 - `POST /api/months/:month/close` (butuh `confirm: true`)
 - `POST /api/months/:month/reopen` (butuh `confirm: true`)
