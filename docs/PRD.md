@@ -23,14 +23,14 @@ Satu orang (pemilik). Pemakaian harian dari HP.
 - Balasan konfirmasi singkat dengan opsi undo.
 - Jika info kurang (mis. nominal tidak ada), agent bertanya balik satu pertanyaan pendek, tidak menebak.
 - Kategori dapat diisi/diubah kemudian dari UI.
-- Input juga tersedia lewat form kecil di web.
+- Input juga tersedia lewat form kecil di web, termasuk pilihan tanggal untuk catatan yang baru sempat dimasukkan belakangan (mis. lupa mencatat kemarin).
 
 ### 2. Hutang piutang
 - Catat hutang (user berhutang) dan piutang (orang berhutang ke user): nama orang, nominal, catatan, jatuh tempo opsional.
 - Catat pembayaran/cicilan; sisa dihitung dari total minus pembayaran.
 - Status otomatis: berjalan / lunas.
 - Daftar hutang piutang per orang beserta sisa dan jatuh tempo.
-- Opsional: pembayaran dapat dikaitkan ke transaksi dan akun.
+- Opsional: pembayaran dapat dikaitkan ke transaksi dan akun. (Dikerjakan: pembayaran otomatis membuat transaksi pengeluaran/pemasukan lewat `source='debt'`, bisa dimatikan dari form pembayaran atau lewat `record_transaction: false`.)
 
 ### 3. Kebutuhan bulanan
 - Template kebutuhan bulanan berulang (listrik, internet, cicilan, dll) dengan nominal perkiraan dan tanggal jatuh tempo.

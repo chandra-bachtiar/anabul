@@ -37,10 +37,10 @@ Semua di bawah `/api`, JSON, butuh cookie sesi kecuali disebut lain. Bulan memak
 - `POST /api/needs/:id/unpay` -> batalkan status lunas (transaksi yang sudah dibuat tetap ada)
 
 ## Hutang piutang
-- `GET /api/debts?status=` -> beserta sisa
+- `GET /api/debts?status=` -> beserta sisa, jumlah pembayaran, dan tanggal bayar terakhir
 - `POST /api/debts`
-- `POST /api/debts/:id/payments` `{ amount, paid_at? }`
-- `GET /api/debts/:id`
+- `POST /api/debts/:id/payments` `{ amount, paid_at?, record_transaction? }` -> pembayaran otomatis dibuatkan transaksi (pengeluaran untuk hutang, pemasukan untuk piutang); isi `record_transaction: false` kalau tidak mau masuk catatan harian
+- `GET /api/debts/:id` -> termasuk `payment_count`, `last_payment_at`, dan `payments` (riwayat, terbaru dulu)
 
 ## Tutup bulan
 - `GET /api/months` -> daftar bulan yang sedang terkunci + bulan berjalan

@@ -62,16 +62,24 @@ yang dinilai adalah bentuk, bukan teks, dan angkanya selalu didampingi teks.
 ### Arah desain saat mengerjakan UI
 
 Reading as: aplikasi keuangan pribadi untuk satu pemilik, dipakai di HP, dengan bahasa
-visual hangat dan playful ala maskot kucing, dial **ENERGY 2 / RHYTHM 2 / MOTION 1**.
+visual hangat dan playful ala maskot kucing, dial **ENERGY 2 / RHYTHM 2 / MOTION 2**.
 
 - ENERGY 2: maskot, oranye hangat, dan bentuk membulat memberi karakter, tapi angka tetap fokus utama.
 - RHYTHM 2: kartu sisa budget sengaja paling menonjol di Home; bagian lain menyusul dengan bobot lebih kecil.
-- MOTION 1: hanya umpan balik interaksi (tekan, fokus, isian progress). Tidak ada animasi dekoratif.
+- MOTION 2: transisi halaman yang halus, daftar yang muncul berurutan, umpan balik tekan, dan satu momen perayaan singkat saat aksi berhasil. Semua berhenti saat `prefers-reduced-motion` aktif.
 
 Motif identitas: atap rumah dengan dua telinga kucing pada ikon navigasi Home, dan mood
 maskot yang mengikuti kondisi budget. Ikon navigasi digambar sendiri dalam satu bahasa
 bentuk (garis 1,8px, ujung membulat) supaya tidak terbaca sebagai set ikon bawaan dan
 serasi dengan bentuk maskot.
+
+### Gerak dan umpan balik
+- Transisi halaman: fade singkat 180ms saat rute berganti (`+layout.svelte`).
+- Daftar utama muncul berurutan (kelas `anim-daftar`, jeda 30ms per baris).
+- Angka sisa budget "pop" saat nilainya berubah (kelas `anim-pop`).
+- Tombol mengecil sedikit saat ditekan, kartu hutang terangkat 2px saat disorot.
+- Momen senang (kebutuhan lunas, hutang lunas, bulan ditutup): konfeti singkat 1,4 detik dari komponen `Confetti.svelte`, dimatikan otomatis kalau pengguna memilih kurangi gerak.
+- Haptic ringan (`navigator.vibrate`) saat catatan/pembayaran tersimpan, dan pola sedikit lebih panjang saat hutang lunas atau bulan ditutup. Tidak jalan kalau perangkat tidak mendukung atau kurangi gerak aktif.
 
 ## Tipografi dan bentuk
 - Font membulat yang ramah: **Nunito** (isi) dan **Fredoka** atau **Baloo 2** (judul/angka besar). Self-host `woff2` (tanpa CDN) supaya PWA bisa offline dan sesuai CSP. Verifikasi dukungan angka tabular; kalau kurang rapi, pakai angka dari font fallback.
@@ -100,9 +108,9 @@ Bilah input chat tersedia di Home dan dapat dibuka dari tab lain lewat tombol me
    - Kebutuhan bulanan belum dibayar/segera jatuh tempo (tap untuk tandai lunas)
    - 5 transaksi terakhir
    - Input chat: placeholder "ketik aja, mis. kopi 25rb"; balasan tampil sebagai gelembung ringkas dengan tombol Undo / Konfirmasi
-2. **Transaksi**: daftar per hari (kartu), filter bulan/kategori, pencarian, tap untuk edit/hapus, tombol tambah manual.
+2. **Transaksi**: daftar per hari (kartu), filter bulan/kategori, pencarian, tap untuk edit/hapus, tombol tambah manual. Form tambah dan ubah sama-sama punya kolom **tanggal catatan** (bisa mundur, ada tombol cepat "Hari ini" dan "Kemarin") supaya catatan yang lupa dimasukkan kemarin tetap bisa dicatat di hari yang benar. Kalau tanggalnya pindah bulan dari yang sedang dibuka, muncul toast yang menyebut tujuan bulannya.
 3. **Budget**: pilih bulan, kategori dengan budget/terpakai/sisa/progress, edit nominal, "salin dari bulan lalu".
-4. **Hutang**: dua segmen (Hutang saya / Piutang saya); kartu per orang dengan sisa, jatuh tempo, riwayat bayar; tombol catat pembayaran.
+4. **Hutang**: dua segmen (Hutang saya / Piutang saya); kartu per orang dengan sisa, jatuh tempo, jumlah pembayaran dan tanggal bayar terakhir, riwayat bayar; tombol catat pembayaran. Form pembayaran punya saklar "Catat juga di buku harian" (bawaan aktif) supaya uang yang keluar/masuk ikut terhitung di bulan itu, dan sheet-nya menutup setelah tersimpan.
 5. **Lainnya**: Kebutuhan bulanan, Tutup bulan, Kategori & akun, Pengaturan (tema, ganti password, logout).
 6. **Tutup bulan** (alur khusus): pratinjau ringkasan -> cek akhir (kebutuhan belum dibayar, hutang jatuh tempo) -> konfirmasi -> hasil snapshot. Bulan tertutup memunculkan lencana "Terkunci" (maskot tidur) dan tombol "Buka kembali" dengan konfirmasi.
 7. **Login**: satu input password, maskot menyapa.

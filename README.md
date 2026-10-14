@@ -153,9 +153,11 @@ Tulis apa adanya di kolom obrolan Home (atau kirim ke bot Telegram):
 |---|---|
 | `kopi 25rb` | pengeluaran Rp 25.000, kategori ditebak dari kata "kopi" |
 | `gajian 5jt` | pemasukan Rp 5.000.000 |
+| `kopi kemarin 25rb` | pengeluaran Rp 25.000 bertanggal kemarin |
+| `makan malam tgl 5 40rb` | pengeluaran bertanggal 5 bulan ini (jika harinya belum lewat) |
 | `gua minjem 200rb ke Budi` | tercatat hutang ke Budi |
 | `Budi minjem 150rb` | tercatat piutang dari Budi |
-| `Budi udah bayar 100rb` | pembayaran piutang Budi |
+| `Budi udah bayar 100rb` | pembayaran piutang Budi, sekaligus masuk pemasukan bulan itu |
 | `listrik udah dibayar` | kebutuhan bulanan lunas, pengeluarannya ikut dibuat |
 | `sisa budget makan berapa?` | sisa budget kategori makan-minum |
 | `bulan ini boros di mana?` | ringkasan per kategori |
@@ -164,6 +166,11 @@ Tulis apa adanya di kolom obrolan Home (atau kirim ke bot Telegram):
 
 Aksi yang berisiko (hapus transaksi, tutup bulan, buka bulan) tidak pernah langsung
 jalan. ANABUL menahan aksinya dan menampilkan tombol konfirmasi dulu.
+
+Kalau kamu mencatat pembayaran hutang atau piutang, uangnya ikut masuk catatan harian
+(pengeluaran untuk hutang, pemasukan untuk piutang) supaya total bulan itu benar. Saklar
+"Catat juga di buku harian" di form pembayaran bisa dimatikan kalau kamu ingin pembayaran
+dicatat terpisah dari arus kas.
 
 Semua tombol di aplikasi juga bisa dipakai tanpa obrolan: Tambah manual di halaman
 Transaksi, isi budget di halaman Budget, dan seterusnya. Kalau obrolan bukan gayamu,
