@@ -7,7 +7,7 @@ COPY apps/web/ ./
 RUN npm run build
 
 # 2) Backend: embed the frontend build, then compile the binary
-FROM golang:1.26-alpine AS api
+FROM golang:1.27-alpine AS api
 WORKDIR /src
 COPY apps/api/go.mod apps/api/go.sum ./
 RUN go mod download
