@@ -17,6 +17,10 @@ apps/api/internal/webui/dist/*
 # Hasil backup database
 backups/
 
+# Catatan lokal (bukan bagian dari proyek)
+.commandcode/
+docs/superpowers/
+
 # OS / editor
 .DS_Store
 Thumbs.db

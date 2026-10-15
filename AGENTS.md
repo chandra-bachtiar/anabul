@@ -60,6 +60,7 @@ Makefile
 - Dokumen terkait diperbarui
 
 ## Indeks dokumen
+- `docs/README.md` indeks dokumen (ringkasan bahasa Inggris)
 - `docs/PRD.md` kebutuhan produk dan acceptance criteria
 - `docs/ARCHITECTURE.md` arsitektur, build, deploy, env
 - `docs/DATA_MODEL.md` skema database

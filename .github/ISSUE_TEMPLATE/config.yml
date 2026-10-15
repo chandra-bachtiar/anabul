@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Laporan keamanan
+    url: https://github.com/chandra-bachtiar/anabul/security/advisories/new
+    about: Jangan buka issue publik untuk celah keamanan; pakai pelaporan privat ini.
+  - name: Cara menjalankan dan berkontribusi
+    url: https://github.com/chandra-bachtiar/anabul/blob/main/CONTRIBUTING.md
+    about: Langkah menjalankan di lokal, aturan kode, dan alur pull request.
+  - name: Dokumentasi produk
+    url: https://github.com/chandra-bachtiar/anabul/tree/main/docs
+    about: PRD, arsitektur, model data, API, desain agent, dan UI.

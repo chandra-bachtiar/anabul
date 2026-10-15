@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (Go)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d finance"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      ANABUL_TEST_DATABASE_URL: postgres://app:app@localhost:5432/finance?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - name: gofmt
+        working-directory: apps/api
+        run: test -z "$(gofmt -l .)"
+      - name: go vet
+        working-directory: apps/api
+        run: go vet ./...
+      - name: go test
+        working-directory: apps/api
+        run: go test ./... -count=1
+
+  web:
+    name: Web (SvelteKit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: install
+        working-directory: apps/web
+        run: npm ci
+      - name: svelte-check
+        working-directory: apps/web
+        run: npm run check
+      - name: build
+        working-directory: apps/web
+        run: npm run build
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t anabul:ci .

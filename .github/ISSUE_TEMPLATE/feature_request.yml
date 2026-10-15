@@ -1,0 +1,55 @@
+name: Feature request
+description: Usulkan fitur atau perbaikan pengalaman pemakaian
+title: "[Fitur] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sebelum mengusulkan, lihat `docs/PRD.md` dan `docs/DECISIONS.md`: mungkin idenya sudah
+        sengaja ditunda, atau justru sudah masuk daftar non-goal (multi-pengguna, integrasi
+        bank, multi-mata uang).
+
+        Boleh ditulis dalam bahasa Indonesia atau Inggris.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah yang mau diselesaikan
+      description: Apa yang bikin repot sekarang? Ceritakan situasinya, bukan solusinya dulu.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Usulanmu
+      description: Kalau ada bayangan bentuknya, tulis di sini — misalnya contoh kalimat obrolan atau tampilan yang kamu inginkan.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatif yang sudah kamu coba
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Bagian yang terkait
+      options:
+        - Catat lewat obrolan / agent
+        - Halaman web (UI)
+        - Bot Telegram
+        - Budget
+        - Hutang piutang
+        - Kebutuhan bulanan
+        - Tutup bulan
+        - Backup, restore, atau migrasi
+        - Deploy, Docker, atau konfigurasi
+        - Dokumentasi
+        - Lainnya
+    validations:
+      required: false

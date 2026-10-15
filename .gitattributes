@@ -1,0 +1,9 @@
+# Jaga konsistensi line ending supaya kontributor Windows tidak bikin diff aneh.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.woff2 binary
+
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -10,6 +10,13 @@ server, bukan model bahasa, jadi catatanmu tetap konsisten walau kalimatnya beba
 Isinya: catat pengeluaran dan pemasukan, kebutuhan bulanan yang berulang, budget per
 kategori beserta sisanya, hutang piutang, dan tutup bulan.
 
+> **In English:** ANABUL is a single-user, mobile-first personal finance app for Indonesian
+> speakers. You send short casual messages ("kopi 25rb", "gua minjem 200rb ke Budi") and an
+> agent turns them into transactions, budgets, recurring bills, and debts. All money math
+> and validation live in the Go backend — the LLM only picks tools and fills arguments.
+> Go + Postgres + SvelteKit, shipped as one Docker image. Product docs live in `docs/`
+> (Indonesian); code, comments, and logs are English.
+
 ## Isi halaman ini
 
 - [Yang kamu butuh](#yang-kamu-butuh)
@@ -25,6 +32,9 @@ kategori beserta sisanya, hutang piutang, dan tutup bulan.
 - [Yang jalan di balik layar](#yang-jalan-di-balik-layar)
 - [Kalau ada masalah](#kalau-ada-masalah)
 - [Struktur repo](#struktur-repo)
+- [Status dan cakupan](#status-dan-cakupan)
+- [Kontribusi](#kontribusi)
+- [Lisensi](#lisensi)
 
 ## Yang kamu butuh
 
@@ -357,3 +367,35 @@ Dokumen di `docs/` adalah sumber kebenaran proyek ini:
 - `docs/DECISIONS.md` keputusan dan catatannya
 
 Nama ANABUL, maskot kucing, dan gaya playful-nya ikut dijelaskan di `docs/UI_SPEC.md`.
+
+## Status dan cakupan
+
+Versi 0.1.0, dipakai untuk keuangan satu orang, dan itu memang batasnya:
+
+- **satu pengguna**: tidak ada multi-akun, tidak ada saldo per dompet, tidak ada berbagi data
+- **tanpa integrasi bank atau e-wallet**: catatan diisi manual atau lewat obrolan
+- **satu mata uang**: rupiah, bilangan bulat, tanpa desimal
+
+Yang sudah selesai dan yang berikutnya ada di `docs/ROADMAP.md`; keputusan yang sudah diambil
+(dan pertanyaan yang masih terbuka) dicatat di `docs/DECISIONS.md`.
+
+## Kontribusi
+
+Kontribusi terbuka, termasuk yang kecil seperti perbaikan typo, terjemahan, dan laporan bug.
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) cara menjalankan proyek dan aturan yang wajib diikuti
+- [SECURITY.md](SECURITY.md) cara melaporkan celah keamanan (jangan lewat issue publik)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) aturan komunitas
+- `AGENTS.md` berisi aturan kerja repo ini untuk manusia maupun AI coding agent
+- `docs/` adalah sumber kebenaran: `PRD.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `API.md`,
+  `AGENT_TOOLS.md`, `UI_SPEC.md`, `ROADMAP.md`, `DECISIONS.md`
+
+`make test` menjalankan `go test ./...` dan `svelte-check`, dan itu yang dicek CI sebelum
+pull request di-merge. Isu dan pull request boleh ditulis dalam bahasa Indonesia atau Inggris.
+
+## Lisensi
+
+[MIT](LICENSE) — bebas dipakai, diubah, dan dijual, cukup sertakan notis hak ciptanya.
+
+Ikon aplikasi dan maskot kucing di `apps/web/static/` dibuat dengan bantuan AI untuk proyek ini
+dan ikut lisensi yang sama.

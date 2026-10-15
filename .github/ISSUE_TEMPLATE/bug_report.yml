@@ -1,0 +1,97 @@
+name: Bug report
+description: Laporkan sesuatu yang tidak jalan sebagaimana mestinya
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah meluangkan waktu. Untuk celah keamanan, jangan pakai form ini —
+        ikuti [SECURITY.md](../blob/main/SECURITY.md).
+
+        Isu boleh ditulis dalam bahasa Indonesia atau Inggris.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Apa yang terjadi?
+      description: Ceritakan kejadiannya, termasuk pesan error yang muncul apa adanya.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Yang kamu harapkan
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah reproduksi
+      placeholder: |
+        1. Buka halaman Hutang
+        2. Tambah pembayaran 100rb
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Bagian yang bermasalah
+      options:
+        - Halaman web (UI)
+        - Catat lewat obrolan / agent
+        - Bot Telegram
+        - Budget
+        - Hutang piutang
+        - Kebutuhan bulanan
+        - Tutup bulan
+        - Backup, restore, atau migrasi
+        - Deploy, Docker, atau konfigurasi
+        - Lainnya
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versi atau commit
+      description: Tag rilis, atau hasil `git rev-parse --short HEAD`.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - Neon
+        - Postgres lokal (container)
+        - Postgres lokal (terpasang di mesin)
+        - Lainnya
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Lingkungan
+      description: Sistem operasi, versi Go/Node, browser, dan apakah LLM diaktifkan.
+      placeholder: |
+        Windows 11, Go 1.26, Node 24, Chrome 141, LLM_API_KEY kosong
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: |
+        Tempel log yang relevan (`docker logs anabul`, atau output `make dev-api`).
+        Hapus dulu apa pun yang bersifat rahasia: connection string, token, API key.
+      render: shell
+    validations:
+      required: false
