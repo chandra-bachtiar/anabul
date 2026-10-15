@@ -14,21 +14,21 @@ func TestParseAmount(t *testing.T) {
 		want  int64
 		err   bool
 	}{
-		{name: "angka polos", input: "25000", want: 25000},
-		{name: "titik ribuan", input: "25.000", want: 25000},
-		{name: "juta penuh", input: "1.500.000", want: 1500000},
-		{name: "sufiks rb", input: "25rb", want: 25000},
-		{name: "sufiks rb spasi", input: "25 rb", want: 25000},
-		{name: "sufiks ribu", input: "12 ribu", want: 12000},
-		{name: "sufiks jt", input: "5jt", want: 5000000},
-		{name: "sufiks juta", input: "5 juta", want: 5000000},
-		{name: "desimal koma", input: "1,5jt", want: 1500000},
-		{name: "desimal titik", input: "2.5jt", want: 2500000},
-		{name: "prefix rp", input: "Rp 12.500", want: 12500},
-		{name: "sufiks k", input: "35k", want: 35000},
-		{name: "nol ditolak", input: "0", err: true},
-		{name: "kosong ditolak", input: "", err: true},
-		{name: "bukan angka", input: "kopi", err: true},
+		{name: "plain digits", input: "25000", want: 25000},
+		{name: "thousands separator", input: "25.000", want: 25000},
+		{name: "full millions", input: "1.500.000", want: 1500000},
+		{name: "rb suffix", input: "25rb", want: 25000},
+		{name: "rb suffix with space", input: "25 rb", want: 25000},
+		{name: "ribu suffix", input: "12 ribu", want: 12000},
+		{name: "jt suffix", input: "5jt", want: 5000000},
+		{name: "juta suffix", input: "5 juta", want: 5000000},
+		{name: "comma decimal", input: "1,5jt", want: 1500000},
+		{name: "dot decimal", input: "2.5jt", want: 2500000},
+		{name: "rp prefix", input: "Rp 12.500", want: 12500},
+		{name: "k suffix", input: "35k", want: 35000},
+		{name: "zero rejected", input: "0", err: true},
+		{name: "empty rejected", input: "", err: true},
+		{name: "not a number", input: "kopi", err: true},
 	}
 
 	for _, tc := range cases {
@@ -36,7 +36,7 @@ func TestParseAmount(t *testing.T) {
 			got, err := ParseAmount(tc.input)
 			if tc.err {
 				if err == nil {
-					t.Fatalf("ParseAmount(%q) ingin error, dapat %d", tc.input, got)
+					t.Fatalf("ParseAmount(%q) wanted an error, got %d", tc.input, got)
 				}
 				return
 			}
@@ -44,7 +44,7 @@ func TestParseAmount(t *testing.T) {
 				t.Fatalf("ParseAmount(%q) error: %v", tc.input, err)
 			}
 			if got != tc.want {
-				t.Fatalf("ParseAmount(%q) = %d, ingin %d", tc.input, got, tc.want)
+				t.Fatalf("ParseAmount(%q) = %d, want %d", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -60,11 +60,11 @@ func TestParseMonth(t *testing.T) {
 		want  string
 		err   bool
 	}{
-		{name: "bulan berjalan", input: "", want: "2026-10-01"},
-		{name: "bulan eksplisit", input: "2026-07", want: "2026-07-01"},
-		{name: "bulan desember", input: "2025-12", want: "2025-12-01"},
-		{name: "bulan tidak valid", input: "2026-13", err: true},
-		{name: "format salah", input: "oktober", err: true},
+		{name: "current month", input: "", want: "2026-10-01"},
+		{name: "explicit month", input: "2026-07", want: "2026-07-01"},
+		{name: "december", input: "2025-12", want: "2025-12-01"},
+		{name: "invalid month", input: "2026-13", err: true},
+		{name: "wrong format", input: "oktober", err: true},
 	}
 
 	for _, tc := range cases {
@@ -72,7 +72,7 @@ func TestParseMonth(t *testing.T) {
 			got, err := ParseMonth(tc.input, now, loc)
 			if tc.err {
 				if err == nil {
-					t.Fatalf("ParseMonth(%q) ingin error", tc.input)
+					t.Fatalf("ParseMonth(%q) wanted an error", tc.input)
 				}
 				return
 			}
@@ -80,7 +80,7 @@ func TestParseMonth(t *testing.T) {
 				t.Fatalf("ParseMonth(%q) error: %v", tc.input, err)
 			}
 			if got.Format("2006-01-02") != tc.want {
-				t.Fatalf("ParseMonth(%q) = %s, ingin %s", tc.input, got.Format("2006-01-02"), tc.want)
+				t.Fatalf("ParseMonth(%q) = %s, want %s", tc.input, got.Format("2006-01-02"), tc.want)
 			}
 		})
 	}
@@ -95,23 +95,23 @@ func TestBudgetStatusAndRemaining(t *testing.T) {
 		remain  int64
 		percent int
 	}{
-		{name: "aman", amount: 100000, spent: 45000, status: StatusOK, remain: 55000, percent: 45},
-		{name: "hampir habis di 80 persen", amount: 100000, spent: 80000, status: StatusWarn, remain: 20000, percent: 80},
-		{name: "lewat sedikit", amount: 100000, spent: 100001, status: StatusOver, remain: -1, percent: 100},
-		{name: "lewat banyak", amount: 200000, spent: 350000, status: StatusOver, remain: -150000, percent: 175},
-		{name: "tanpa budget", amount: 0, spent: 25000, status: StatusNone, remain: -25000, percent: 0},
+		{name: "comfortable", amount: 100000, spent: 45000, status: StatusOK, remain: 55000, percent: 45},
+		{name: "warn at 80 percent", amount: 100000, spent: 80000, status: StatusWarn, remain: 20000, percent: 80},
+		{name: "just over", amount: 100000, spent: 100001, status: StatusOver, remain: -1, percent: 100},
+		{name: "way over", amount: 200000, spent: 350000, status: StatusOver, remain: -150000, percent: 175},
+		{name: "no budget set", amount: 0, spent: 25000, status: StatusNone, remain: -25000, percent: 0},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := BudgetStatus(tc.amount, tc.spent); got != tc.status {
-				t.Fatalf("BudgetStatus = %s, ingin %s", got, tc.status)
+				t.Fatalf("BudgetStatus = %s, want %s", got, tc.status)
 			}
 			if got := BudgetRemaining(tc.amount, tc.spent); got != tc.remain {
-				t.Fatalf("BudgetRemaining = %d, ingin %d", got, tc.remain)
+				t.Fatalf("BudgetRemaining = %d, want %d", got, tc.remain)
 			}
 			if got := progress(tc.amount, tc.spent); got != tc.percent {
-				t.Fatalf("progress = %d, ingin %d", got, tc.percent)
+				t.Fatalf("progress = %d, want %d", got, tc.percent)
 			}
 		})
 	}
@@ -126,17 +126,17 @@ func TestMood(t *testing.T) {
 		anyOver bool
 		want    string
 	}{
-		{name: "bulan terkunci tidur", locked: true, budget: 100000, spent: 10000, want: moodTidur},
-		{name: "pemakaian rendah senang", budget: 100000, spent: 30000, want: moodSenang},
-		{name: "tepat 80 persen khawatir", budget: 100000, spent: 80000, want: moodKhawatir},
-		{name: "kategori lewat khawatir", budget: 500000, spent: 100000, anyOver: true, want: moodKhawatir},
-		{name: "tanpa budget senang", budget: 0, spent: 250000, want: moodSenang},
+		{name: "closed month sleeps", locked: true, budget: 100000, spent: 10000, want: moodAsleep},
+		{name: "light spending is happy", budget: 100000, spent: 30000, want: moodHappy},
+		{name: "exactly 80 percent worries", budget: 100000, spent: 80000, want: moodWorried},
+		{name: "a category over budget worries", budget: 500000, spent: 100000, anyOver: true, want: moodWorried},
+		{name: "no budget is happy", budget: 0, spent: 250000, want: moodHappy},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := Mood(tc.locked, tc.budget, tc.spent, tc.anyOver); got != tc.want {
-				t.Fatalf("Mood = %s, ingin %s", got, tc.want)
+				t.Fatalf("Mood = %s, want %s", got, tc.want)
 			}
 		})
 	}
@@ -154,12 +154,12 @@ func TestMatchCategory(t *testing.T) {
 		note string
 		want int64
 	}{
-		{name: "keyword kopi", note: "kopi susu", want: 1},
-		{name: "keyword bensin", note: "isi bensin motor", want: 2},
-		{name: "keyword listrik", note: "bayar listrik", want: 3},
-		{name: "nama kategori langsung", note: "transport harian", want: 2},
-		{name: "tanpa kecocokan", note: "sesuatu yang aneh", want: 0},
-		{name: "catatan kosong", note: "   ", want: 0},
+		{name: "kopi keyword", note: "kopi susu", want: 1},
+		{name: "bensin keyword", note: "isi bensin motor", want: 2},
+		{name: "listrik keyword", note: "bayar listrik", want: 3},
+		{name: "category name", note: "transport harian", want: 2},
+		{name: "no match", note: "sesuatu yang aneh", want: 0},
+		{name: "blank note", note: "   ", want: 0},
 	}
 
 	for _, tc := range cases {
@@ -170,7 +170,7 @@ func TestMatchCategory(t *testing.T) {
 				got = match.ID
 			}
 			if got != tc.want {
-				t.Fatalf("MatchCategory(%q) = %d, ingin %d", tc.note, got, tc.want)
+				t.Fatalf("MatchCategory(%q) = %d, want %d", tc.note, got, tc.want)
 			}
 		})
 	}
@@ -187,20 +187,20 @@ func TestIsLocked(t *testing.T) {
 		reopened pgtype.Timestamptz
 		want     bool
 	}{
-		{name: "belum pernah ditutup", want: false},
+		{name: "never closed", want: false},
 		{
-			name:     "ditutup dan belum dibuka",
+			name:     "closed and not reopened",
 			closedAt: pgtype.Timestamptz{Time: closed, Valid: true},
 			want:     true,
 		},
 		{
-			name:     "sudah dibuka kembali",
+			name:     "reopened after closing",
 			closedAt: pgtype.Timestamptz{Time: closed, Valid: true},
 			reopened: pgtype.Timestamptz{Time: reopenedLater, Valid: true},
 			want:     false,
 		},
 		{
-			name:     "ditutup ulang setelah dibuka",
+			name:     "closed again after reopening",
 			closedAt: pgtype.Timestamptz{Time: closed, Valid: true},
 			reopened: pgtype.Timestamptz{Time: reopenedEarlier, Valid: true},
 			want:     true,
@@ -210,7 +210,7 @@ func TestIsLocked(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := IsLocked(tc.closedAt, tc.reopened); got != tc.want {
-				t.Fatalf("IsLocked = %v, ingin %v", got, tc.want)
+				t.Fatalf("IsLocked = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -225,17 +225,17 @@ func TestDueDateFromDay(t *testing.T) {
 		day   int
 		want  string
 	}{
-		{name: "hari biasa", month: time.Date(2026, time.October, 1, 0, 0, 0, 0, loc), day: 5, want: "2026-10-05"},
-		{name: "februari dipangkas", month: time.Date(2026, time.February, 1, 0, 0, 0, 0, loc), day: 31, want: "2026-02-28"},
-		{name: "april 30 hari", month: time.Date(2026, time.April, 1, 0, 0, 0, 0, loc), day: 31, want: "2026-04-30"},
-		{name: "kabisat", month: time.Date(2028, time.February, 1, 0, 0, 0, 0, loc), day: 30, want: "2028-02-29"},
+		{name: "ordinary day", month: time.Date(2026, time.October, 1, 0, 0, 0, 0, loc), day: 5, want: "2026-10-05"},
+		{name: "february clamps", month: time.Date(2026, time.February, 1, 0, 0, 0, 0, loc), day: 31, want: "2026-02-28"},
+		{name: "april has 30 days", month: time.Date(2026, time.April, 1, 0, 0, 0, 0, loc), day: 31, want: "2026-04-30"},
+		{name: "leap year", month: time.Date(2028, time.February, 1, 0, 0, 0, 0, loc), day: 30, want: "2028-02-29"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := DueDateFromDay(tc.month, tc.day)
 			if got.Format("2006-01-02") != tc.want {
-				t.Fatalf("DueDateFromDay = %s, ingin %s", got.Format("2006-01-02"), tc.want)
+				t.Fatalf("DueDateFromDay = %s, want %s", got.Format("2006-01-02"), tc.want)
 			}
 		})
 	}
@@ -255,7 +255,7 @@ func TestFormatAmount(t *testing.T) {
 
 	for _, tc := range cases {
 		if got := FormatAmount(tc.amount); got != tc.want {
-			t.Fatalf("FormatAmount(%d) = %s, ingin %s", tc.amount, got, tc.want)
+			t.Fatalf("FormatAmount(%d) = %s, want %s", tc.amount, got, tc.want)
 		}
 	}
 }

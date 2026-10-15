@@ -12,20 +12,20 @@ import (
 	"anabul/internal/tools"
 )
 
-// Pinger adalah bagian database yang dibutuhkan layer HTTP.
+// Pinger is the slice of the database the HTTP layer needs.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// ChatRunner adalah agent yang dipakai endpoint chat.
+// ChatRunner is the agent behind the chat endpoints.
 type ChatRunner interface {
 	Chat(ctx context.Context, channel, message string) (agent.Reply, error)
 	Confirm(ctx context.Context, channel, actionID string) (agent.Reply, error)
 	Cancel(ctx context.Context, actionID string) (agent.Reply, error)
 }
 
-// Deps merangkai kebutuhan server supaya pemanggil tidak perlu menghafal urutan
-// argumen.
+// Deps groups the server dependencies so callers do not have to remember the
+// argument order.
 type Deps struct {
 	Cfg   config.Config
 	DB    Pinger
@@ -34,11 +34,10 @@ type Deps struct {
 	Chat  ChatRunner
 	Auth  *auth.Manager
 	Alert *alert.Notifier
-	// ScriptHashes adalah hash CSP untuk skrip inline di index.html.
+	// ScriptHashes are the CSP hashes for inline scripts in index.html.
 	ScriptHashes []string
 }
 
-// Server merangkai seluruh route aplikasi.
 type Server struct {
 	cfg          config.Config
 	db           Pinger
@@ -71,8 +70,8 @@ func New(deps Deps) *Server {
 
 func (s *Server) now() time.Time { return s.nowFn() }
 
-// Handler mengembalikan router utama: /healthz, /api/*, webhook Telegram, lalu
-// frontend statis sebagai fallback.
+// Handler returns the main router: /healthz, /api/*, the Telegram webhook, then
+// the static frontend as the fallback.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
@@ -133,11 +132,11 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("/", s.web)
 
-	// Header pengaman dipasang paling luar, lalu alert 5xx.
+	// Security headers sit outermost, then 5xx alerting.
 	return s.securityHeaders(s.alertOnServerError(mux))
 }
 
-// protect memastikan hanya request dengan sesi valid yang diteruskan.
+// protect lets only requests with a valid session through.
 func (s *Server) protect(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.authConfigured(r.Context()) {

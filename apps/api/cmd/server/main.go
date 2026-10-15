@@ -32,23 +32,22 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
 	if err := run(); err != nil {
-		slog.Error("server berhenti dengan error", "error", err)
-		laporErrorFatal(err)
+		slog.Error("server exited with error", "error", err)
+		reportFatalError(err)
 		os.Exit(1)
 	}
 }
 
-// laporErrorFatal mengirim notifikasi saat server gagal start. Konfigurasi
-// dibaca langsung dari environment karena run() bisa berhenti sebelum
-// notifier dibuat.
-func laporErrorFatal(err error) {
+// reportFatalError sends an alert when the server fails to start. Config is read
+// straight from the environment because run() can fail before the notifier exists.
+func reportFatalError(err error) {
 	url := strings.TrimSpace(os.Getenv("ALERT_WEBHOOK_URL"))
 	if url == "" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	alert.New(url).Kirim(ctx, "server berhenti: "+err.Error())
+	alert.New(url).Send(ctx, "server stopped: "+err.Error())
 }
 
 func run() error {
@@ -62,7 +61,7 @@ func run() error {
 
 	location, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
-		return fmt.Errorf("zona waktu %q tidak dikenal: %w", cfg.Timezone, err)
+		return fmt.Errorf("unknown timezone %q: %w", cfg.Timezone, err)
 	}
 
 	pool, err := connect(ctx, cfg.DatabaseURL)
@@ -80,16 +79,16 @@ func run() error {
 
 	alerts := alert.New(cfg.AlertWebhookURL)
 	if alerts.Enabled() {
-		slog.Info("notifikasi error aktif", "via", "ALERT_WEBHOOK_URL")
+		slog.Info("error notifications enabled", "via", "ALERT_WEBHOOK_URL")
 	}
 
 	authManager := auth.New(queries, cfg.AppPasswordHash)
 	seeded, err := authManager.EnsureSeeded(ctx)
 	if err != nil {
-		return fmt.Errorf("siapkan password: %w", err)
+		return fmt.Errorf("prepare password: %w", err)
 	}
 	if seeded {
-		slog.Info("password awal disalin dari environment ke database, bisa diganti dari Pengaturan")
+		slog.Info("initial password copied from the environment to the database, it can be changed from the app settings")
 	}
 
 	chatbot := agent.New(agent.Config{
@@ -98,19 +97,19 @@ func run() error {
 		Model:   cfg.LLMModel,
 	}, service, queries)
 	if !chatbot.LLMEnabled() {
-		slog.Warn("LLM_API_KEY belum diisi, agent memakai parser sederhana")
+		slog.Warn("LLM_API_KEY is not set, the agent uses the simple parser")
 	}
 	if configured, err := authManager.Configured(ctx); err == nil && !configured {
-		slog.Warn("APP_PASSWORD_HASH belum diisi, endpoint /api tidak bisa dipakai")
+		slog.Warn("APP_PASSWORD_HASH is not set, the /api endpoints are unavailable")
 	} else if err == nil {
 		if usingDefault, err := authManager.UsingDefault(ctx); err == nil && usingDefault {
-			slog.Warn("password masih memakai default, sebaiknya diganti dari halaman Pengaturan")
+			slog.Warn("password is still the default, change it from the app settings")
 		}
 	}
 
 	scheduler := sched.New(service)
 	if err := scheduler.Start(ctx); err != nil {
-		return fmt.Errorf("nyalakan scheduler: %w", err)
+		return fmt.Errorf("start scheduler: %w", err)
 	}
 	defer scheduler.Stop()
 
@@ -124,7 +123,7 @@ func run() error {
 			Chat:  chatbot,
 			Auth:  authManager,
 			Alert: alerts,
-			// Skrip inline dari SvelteKit diizinkan lewat hash, bukan unsafe-inline.
+			// SvelteKit inline scripts are allowed via hashes, not unsafe-inline.
 			ScriptHashes: webui.Hashes(),
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -132,7 +131,7 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("anabul siap menerima request", "addr", srv.Addr, "timezone", cfg.Timezone, "llm", chatbot.LLMEnabled())
+		slog.Info("anabul ready to serve requests", "addr", srv.Addr, "timezone", cfg.Timezone, "llm", chatbot.LLMEnabled())
 		errCh <- srv.ListenAndServe()
 	}()
 
@@ -145,7 +144,7 @@ func run() error {
 	case <-ctx.Done():
 	}
 
-	slog.Info("menerima sinyal berhenti, menutup server")
+	slog.Info("shutdown signal received, closing server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
@@ -154,15 +153,15 @@ func run() error {
 	return nil
 }
 
-// connect membuka pool dan menunggu database siap (misal saat docker compose
-// baru dinyalakan, atau Neon yang baru bangun dari idle).
+// connect opens the pool and waits for the database to come up, e.g. right after
+// docker compose starts or when a Neon instance wakes from idle.
 func connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
-	// Endpoint pooler Neon (PgBouncer) tidak mendukung prepared statement
-	// lintas transaksi, jadi query dikirim langsung.
+	// Neon's pooler (PgBouncer) has no cross-transaction prepared statements, so
+	// queries are sent directly.
 	if strings.Contains(cfg.ConnConfig.Host, "-pooler") {
 		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
 	}
@@ -170,7 +169,7 @@ func connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("siapkan pool database: %w", err)
+		return nil, fmt.Errorf("create database pool: %w", err)
 	}
 
 	const attempts = 10
@@ -182,7 +181,7 @@ func connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		if pingErr == nil {
 			return pool, nil
 		}
-		slog.Warn("menunggu database siap", "percobaan", i, "error", pingErr)
+		slog.Warn("waiting for database", "attempt", i, "error", pingErr)
 		select {
 		case <-ctx.Done():
 			pool.Close()
@@ -191,5 +190,5 @@ func connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		}
 	}
 	pool.Close()
-	return nil, fmt.Errorf("database tidak dapat dihubungi: %w", pingErr)
+	return nil, fmt.Errorf("database unreachable: %w", pingErr)
 }

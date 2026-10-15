@@ -23,7 +23,7 @@ type toolSchemaFunction struct {
 	Parameters  map[string]any `json:"parameters"`
 }
 
-// toolDef menggabungkan skema tool dengan eksekusinya di layer tools.
+// toolDef pairs the schema the model sees with the call that executes it.
 type toolDef struct {
 	Name        string
 	Description string
@@ -66,21 +66,21 @@ func boolean(description string) map[string]any {
 	return map[string]any{"type": "boolean", "description": description}
 }
 
-const amountHint = "nominal integer rupiah tanpa titik/koma, mis. 25000"
+const amountHint = "integer rupiah, no separators, e.g. 25000"
 
-// registry berisi semua tool yang boleh dipanggil model.
+// registry lists every tool the model may call.
 func (a *Agent) registry() []toolDef {
 	return []toolDef{
 		{
 			Name:        "add_transaction",
-			Description: "Catat pengeluaran atau pemasukan baru. Isi date kalau pengguna menyebut waktu lain, misalnya kemarin atau tanggal tertentu.",
+			Description: "Record a new expense or income. Fill date when the user names another day, e.g. kemarin or a specific date.",
 			Parameters: schema(map[string]any{
 				"amount":   integer(amountHint),
-				"note":     str("catatan singkat, mis. kopi"),
-				"type":     strEnum("expense untuk pengeluaran, income untuk pemasukan", "expense", "income"),
-				"category": str("nama kategori (opsional)"),
-				"account":  str("nama akun: cash, bank, e-wallet (opsional)"),
-				"date":     str("tanggal catatan format YYYY-MM-DD kalau bukan hari ini, mis. kemarin berarti tanggal kemarin"),
+				"note":     str("short note, e.g. kopi"),
+				"type":     strEnum("expense for money going out, income for money coming in", "expense", "income"),
+				"category": str("category name (optional)"),
+				"account":  str("account name: cash, bank, e-wallet (optional)"),
+				"date":     str("entry date as YYYY-MM-DD when it is not today, e.g. kemarin means yesterday's date"),
 			}, "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -128,14 +128,14 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "update_transaction",
-			Description: "Ubah transaksi, mis. untuk koreksi 'yang tadi salah'. Pakai last=true untuk transaksi terakhir.",
+			Description: "Change an existing transaction, e.g. to fix 'yang tadi salah'. Use last=true for the most recent one.",
 			Parameters: schema(map[string]any{
-				"id":       integer("id transaksi kalau diketahui"),
-				"last":     boolean("true kalau yang dimaksud transaksi terakhir"),
+				"id":       integer("transaction id when known"),
+				"last":     boolean("true when the target is the latest transaction"),
 				"amount":   integer(amountHint),
-				"note":     str("catatan baru"),
+				"note":     str("new note"),
 				"type":     strEnum("", "expense", "income"),
-				"category": str("nama kategori baru"),
+				"category": str("new category name"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -187,10 +187,10 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "delete_transaction",
-			Description: "Hapus transaksi. Aksi berisiko: selalu minta konfirmasi ke pengguna.",
+			Description: "Delete a transaction. Risky action: always ask the user to confirm first.",
 			Parameters: schema(map[string]any{
-				"id":   integer("id transaksi"),
-				"last": boolean("true kalau yang dimaksud transaksi terakhir"),
+				"id":   integer("transaction id"),
+				"last": boolean("true when the target is the latest transaction"),
 			}),
 			Risky: true,
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
@@ -222,9 +222,9 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "get_summary",
-			Description: "Ringkasan pemasukan, pengeluaran, kategori, dan budget pada satu bulan.",
+			Description: "Income, expense, category, and budget summary for one month.",
 			Parameters: schema(map[string]any{
-				"month":    str("bulan format YYYY-MM, kosongkan untuk bulan ini"),
+				"month":    str("month as YYYY-MM, empty for the current month"),
 				"group_by": strEnum("", "category"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
@@ -254,11 +254,11 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "set_budget",
-			Description: "Simpan nominal budget satu kategori pada satu bulan.",
+			Description: "Store the budget amount for one category in one month.",
 			Parameters: schema(map[string]any{
-				"category": str("nama kategori"),
+				"category": str("category name"),
 				"amount":   integer(amountHint),
-				"month":    str("bulan YYYY-MM, kosongkan untuk bulan ini"),
+				"month":    str("month as YYYY-MM, empty for the current month"),
 			}, "category", "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -292,10 +292,10 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "get_budget_remaining",
-			Description: "Sisa budget per kategori pada satu bulan.",
+			Description: "Remaining budget per category for one month.",
 			Parameters: schema(map[string]any{
-				"category": str("nama kategori, kosongkan untuk semua"),
-				"month":    str("bulan YYYY-MM, kosongkan untuk bulan ini"),
+				"category": str("category name, empty for all of them"),
+				"month":    str("month as YYYY-MM, empty for the current month"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -332,13 +332,13 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "add_debt",
-			Description: "Catat hutang (user berhutang) atau piutang (orang berhutang ke user).",
+			Description: "Record a debt (the user owes) or a receivable (someone owes the user).",
 			Parameters: schema(map[string]any{
-				"person":    str("nama orang"),
-				"direction": strEnum("hutang kalau user yang berhutang, piutang kalau orang lain", "hutang", "piutang"),
+				"person":    str("person's name"),
+				"direction": strEnum("hutang when the user owes, piutang when the other person does", "hutang", "piutang"),
 				"amount":    integer(amountHint),
-				"note":      str("catatan (opsional)"),
-				"due_date":  str("jatuh tempo YYYY-MM-DD (opsional)"),
+				"note":      str("note (optional)"),
+				"due_date":  str("due date as YYYY-MM-DD (optional)"),
 			}, "person", "direction", "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -381,13 +381,13 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "add_debt_payment",
-			Description: "Catat pembayaran/cicilan hutang atau piutang. Pembayaran otomatis dibuatkan transaksi (pengeluaran untuk hutang, pemasukan untuk piutang) kecuali record_transaction diisi false.",
+			Description: "Record a payment or installment on a debt or receivable. The payment also books a transaction (expense for hutang, income for piutang) unless record_transaction is false.",
 			Parameters: schema(map[string]any{
-				"person":             str("nama orang"),
-				"debt_id":            integer("id hutang kalau diketahui"),
+				"person":             str("person's name"),
+				"debt_id":            integer("debt id when known"),
 				"amount":             integer(amountHint),
-				"date":               str("tanggal pembayaran format YYYY-MM-DD kalau bukan hari ini"),
-				"record_transaction": boolean("false kalau pembayaran tidak boleh masuk catatan harian (bawaan true)"),
+				"date":               str("payment date as YYYY-MM-DD when it is not today"),
+				"record_transaction": boolean("false to keep the payment out of the daily ledger (default true)"),
 			}, "amount"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -408,16 +408,16 @@ func (a *Agent) registry() []toolDef {
 				if err != nil {
 					return nil, err
 				}
-				catat := true
+				record := true
 				if in.RecordTransaction != nil {
-					catat = *in.RecordTransaction
+					record = *in.RecordTransaction
 				}
 				debt, err := a.tools.AddDebtPayment(ctx, tools.AddDebtPaymentInput{
-					Person:         in.Person,
-					DebtID:         in.DebtID,
-					Amount:         amount,
-					PaidAt:         paidAt,
-					CatatTransaksi: catat,
+					Person:            in.Person,
+					DebtID:            in.DebtID,
+					Amount:            amount,
+					PaidAt:            paidAt,
+					RecordTransaction: record,
 				})
 				if err != nil {
 					return nil, err
@@ -432,16 +432,16 @@ func (a *Agent) registry() []toolDef {
 					"status":             debt.Status,
 					"payment_count":      debt.PaymentCount,
 					"last_payment":       debt.LastPaymentAt,
-					"record_transaction": catat,
+					"record_transaction": record,
 				}, nil
 			},
 		},
 		{
 			Name:        "list_debts",
-			Description: "Daftar hutang piutang beserta sisa dan jatuh temponya.",
+			Description: "List debts and receivables with their remaining amount and due date.",
 			Parameters: schema(map[string]any{
-				"status": strEnum("open atau settled, kosongkan untuk semua", "open", "settled"),
-				"person": str("filter nama orang"),
+				"status": strEnum("open or settled, empty for all", "open", "settled"),
+				"person": str("filter by person"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -460,10 +460,10 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "list_monthly_needs",
-			Description: "Daftar kebutuhan bulanan (listrik, internet, dan sejenisnya).",
+			Description: "List monthly needs (electricity, internet, and the like).",
 			Parameters: schema(map[string]any{
-				"month":  str("bulan YYYY-MM, kosongkan untuk bulan ini"),
-				"status": strEnum("unpaid atau paid, kosongkan untuk semua", "unpaid", "paid"),
+				"month":  str("month as YYYY-MM, empty for the current month"),
+				"status": strEnum("unpaid or paid, empty for all", "unpaid", "paid"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -482,10 +482,10 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "mark_need_paid",
-			Description: "Tandai kebutuhan bulanan sudah dibayar; otomatis membuat transaksi pengeluaran.",
+			Description: "Mark a monthly need as paid; books the matching expense.",
 			Parameters: schema(map[string]any{
-				"name":   str("nama kebutuhan, mis. listrik"),
-				"amount": integer("nominal kalau berbeda dari perkiraan (opsional)"),
+				"name":   str("need name, e.g. listrik"),
+				"amount": integer("amount when it differs from the estimate (optional)"),
 			}, "name"),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -525,9 +525,9 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "preview_close_month",
-			Description: "Ringkasan sebelum menutup bulan: total, budget, kebutuhan belum dibayar, hutang.",
+			Description: "Summary before closing the month: totals, budget, unpaid needs, debts.",
 			Parameters: schema(map[string]any{
-				"month": str("bulan YYYY-MM, kosongkan untuk bulan ini"),
+				"month": str("month as YYYY-MM, empty for the current month"),
 			}),
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
 				var in struct {
@@ -557,9 +557,9 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "close_month",
-			Description: "Tutup bulan: kunci transaksi, simpan snapshot, siapkan bulan berikutnya. Aksi berisiko, selalu butuh konfirmasi pengguna.",
+			Description: "Close the month: lock its transactions, store the snapshot, prepare the next month. Risky action, always needs the user's confirmation.",
 			Parameters: schema(map[string]any{
-				"month": str("bulan YYYY-MM yang mau ditutup, kosongkan untuk bulan ini"),
+				"month": str("month as YYYY-MM to close, empty for the current month"),
 			}),
 			Risky: true,
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
@@ -586,9 +586,9 @@ func (a *Agent) registry() []toolDef {
 		},
 		{
 			Name:        "reopen_month",
-			Description: "Buka kembali bulan yang sudah ditutup supaya bisa diedit lagi. Aksi berisiko, butuh konfirmasi pengguna.",
+			Description: "Reopen a closed month so it can be edited again. Risky action, needs the user's confirmation.",
 			Parameters: schema(map[string]any{
-				"month": str("bulan YYYY-MM yang mau dibuka"),
+				"month": str("month as YYYY-MM to reopen"),
 			}, "month"),
 			Risky: true,
 			Run: func(ctx context.Context, args json.RawMessage) (any, error) {
@@ -607,11 +607,11 @@ func (a *Agent) registry() []toolDef {
 	}
 }
 
-// runTool menjalankan satu tool; tool berisiko hanya lewat alur konfirmasi.
+// runTool executes one tool; risky ones only ever run through the confirmation flow.
 func (a *Agent) runTool(ctx context.Context, name string, args json.RawMessage, confirmed bool) (string, error) {
 	def, found := a.toolByName(name)
 	if !found {
-		return "", fmt.Errorf("tool %s tidak dikenal", name)
+		return "", fmt.Errorf("unknown tool %s", name)
 	}
 
 	if def.Risky && !confirmed {
@@ -672,7 +672,7 @@ func decodeArgs(raw json.RawMessage, dst any) error {
 	return nil
 }
 
-// amountOf menerima angka dari model bisa berupa number atau string.
+// amountOf takes whatever the model sent: a number or a string like "25rb".
 func amountOf(value json.Number) (int64, error) {
 	raw := strings.TrimSpace(value.String())
 	if raw == "" {
@@ -717,6 +717,7 @@ func (a *Agent) categoryID(ctx context.Context, name string) (int64, error) {
 	return 0, tools.NewInvalidError("kategori %q tidak ada", name).WithAvailable(names...)
 }
 
+// encodeToolError hands the model a JSON error it can relay to the user.
 func encodeToolError(err error) string {
 	var domainErr *tools.Error
 	if errors.As(err, &domainErr) {

@@ -7,15 +7,10 @@ import (
 	"strings"
 )
 
-// LoadDotEnv membaca berkas .env (kalau ada) dan mengisi environment yang belum
-// diset. Dipakai perintah CLI seperti cmd/backup dan cmd/restore supaya bisa
-// dijalankan langsung tanpa export manual; server di container tetap hanya
-// membaca environment.
-//
-// Pencarian dimulai dari direktori kerja, lalu naik sampai tiga tingkat ke atas,
-// jadi `go run ./cmd/backup` dari apps/api tetap menemukan .env di akar repo.
+// LoadDotEnv fills still-unset environment variables from a .env file up to three
+// directories above the working directory; existing values always win.
 func LoadDotEnv() error {
-	path := cariDotEnv()
+	path := findDotEnv()
 	if path == "" {
 		return nil
 	}
@@ -48,7 +43,7 @@ func LoadDotEnv() error {
 	return scanner.Err()
 }
 
-func cariDotEnv() string {
+func findDotEnv() string {
 	dir, err := os.Getwd()
 	if err != nil {
 		return ""

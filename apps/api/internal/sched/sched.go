@@ -1,5 +1,5 @@
-// Package sched berisi penjadwalan (cron) untuk men-generate kebutuhan
-// bulanan dan menutup bulan secara otomatis.
+// Package sched contains the cron jobs that generate monthly needs and close
+// the month automatically.
 package sched
 
 import (
@@ -12,7 +12,7 @@ import (
 	"anabul/internal/tools"
 )
 
-// Scheduler menjalankan tugas berkala di zona waktu aplikasi.
+// Scheduler runs periodic jobs in the app timezone.
 type Scheduler struct {
 	tools *tools.Service
 	cron  *cron.Cron
@@ -26,7 +26,8 @@ func New(svc *tools.Service) *Scheduler {
 	}
 }
 
-// Start menjalankan tugas awal bulan dan sekali catch-up untuk bulan berjalan.
+// Start registers the start-of-month job and runs one catch-up for the current
+// month.
 func (s *Scheduler) Start(ctx context.Context) error {
 	if _, err := s.cron.AddFunc("5 0 1 * *", func() {
 		s.generateMonth(context.WithoutCancel(ctx), s.tools.CurrentMonth())
@@ -51,8 +52,8 @@ func (s *Scheduler) generateMonth(ctx context.Context, month time.Time) {
 
 	count, err := s.tools.GenerateMonthlyNeeds(ctx, tools.FormatMonth(month))
 	if err != nil {
-		slog.Error("gagal menyiapkan kebutuhan bulanan", "month", tools.FormatMonth(month), "error", err)
+		slog.Error("failed to generate monthly needs", "month", tools.FormatMonth(month), "error", err)
 		return
 	}
-	slog.Info("kebutuhan bulanan siap", "month", tools.FormatMonth(month), "total", count)
+	slog.Info("monthly needs ready", "month", tools.FormatMonth(month), "total", count)
 }

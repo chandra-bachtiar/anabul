@@ -2,8 +2,6 @@ package http
 
 import (
 	"net/http"
-
-	"anabul/internal/agent"
 )
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -52,5 +50,3 @@ func (s *Server) handleCancelAction(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, reply)
 }
-
-var _ = agent.Reply{}

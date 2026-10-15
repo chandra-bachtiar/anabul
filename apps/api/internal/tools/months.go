@@ -11,7 +11,6 @@ import (
 	"anabul/internal/store"
 )
 
-// MonthSummary mengembalikan ringkasan satu bulan.
 func (s *Service) MonthSummary(ctx context.Context, monthArg string) (Summary, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -20,7 +19,6 @@ func (s *Service) MonthSummary(ctx context.Context, monthArg string) (Summary, e
 	return s.buildSummary(ctx, month)
 }
 
-// MonthPreview menyiapkan ringkasan sebelum bulan ditutup.
 func (s *Service) MonthPreview(ctx context.Context, monthArg string) (MonthPreview, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -78,7 +76,8 @@ func (s *Service) MonthPreview(ctx context.Context, monthArg string) (MonthPrevi
 	return preview, nil
 }
 
-// CloseMonth mengunci bulan, menyimpan snapshot, dan menyiapkan bulan berikutnya.
+// CloseMonth locks the month, stores its snapshot, and carries budgets and
+// recurring needs into the next month in the same transaction.
 func (s *Service) CloseMonth(ctx context.Context, monthArg string) (Snapshot, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -143,7 +142,6 @@ func (s *Service) CloseMonth(ctx context.Context, monthArg string) (Snapshot, er
 	return snapshot, nil
 }
 
-// ReopenMonth membuka kembali bulan yang sudah ditutup.
 func (s *Service) ReopenMonth(ctx context.Context, monthArg string) error {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -165,7 +163,6 @@ func (s *Service) ReopenMonth(ctx context.Context, monthArg string) error {
 	return nil
 }
 
-// ClosedMonths mengembalikan daftar bulan yang sedang terkunci.
 func (s *Service) ClosedMonths(ctx context.Context) ([]string, error) {
 	rows, err := s.q.ListMonthClosings(ctx)
 	if err != nil {

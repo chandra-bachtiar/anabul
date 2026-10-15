@@ -1,5 +1,5 @@
-// Package agent berisi loop LLM tool calling, registry tool, dan penyusunan
-// konteks untuk ANABUL.
+// Package agent runs the LLM tool-calling loop, the tool registry, and the
+// context assembly for ANABUL.
 package agent
 
 import (
@@ -24,10 +24,10 @@ const (
 	maxTurns          = 5
 	historyLimit      = 8
 	pendingTTL        = 15 * time.Minute
-	fallbackModelName = "parser-sederhana"
+	fallbackModelName = "simple-parser"
 )
 
-// Reply adalah hasil percakapan yang dikirim balik ke klien.
+// Reply is what the client gets back for one user message.
 type Reply struct {
 	Reply         string   `json:"reply"`
 	PendingAction *Pending `json:"pending_action,omitempty"`
@@ -35,27 +35,24 @@ type Reply struct {
 	Source        string   `json:"source,omitempty"`
 }
 
-// Undo memberi UI kesempatan membatalkan transaksi yang baru dicatat.
+// Undo lets the UI take back the transaction that was just recorded.
 type Undo struct {
 	TransactionID int64  `json:"transaction_id"`
 	Label         string `json:"label,omitempty"`
 }
 
-// Pending adalah aksi berisiko yang menunggu konfirmasi pengguna.
+// Pending is a risky action waiting for the user to confirm it.
 type Pending struct {
 	ID      string `json:"id"`
 	Summary string `json:"summary"`
 }
 
-// Config berisi pengaturan klien LLM.
 type Config struct {
 	BaseURL string
 	APIKey  string
 	Model   string
 }
 
-// Agent menjalankan percakapan: membangun konteks, memanggil LLM, menjalankan
-// tool, dan mencatat semuanya ke agent_logs.
 type Agent struct {
 	cfg   Config
 	tools *tools.Service
@@ -63,8 +60,7 @@ type Agent struct {
 	llm   *llmClient
 }
 
-// New membuat agent. Klien LLM hanya aktif kalau API key dan base URL terisi;
-// tanpa itu agent memakai parser sederhana.
+// New falls back to the simple parser when the LLM is not configured.
 func New(cfg Config, svc *tools.Service, q *store.Queries) *Agent {
 	agent := &Agent{cfg: cfg, tools: svc, q: q}
 	if strings.TrimSpace(cfg.APIKey) != "" && strings.TrimSpace(cfg.BaseURL) != "" {
@@ -73,10 +69,9 @@ func New(cfg Config, svc *tools.Service, q *store.Queries) *Agent {
 	return agent
 }
 
-// LLMEnabled menandai apakah agent memakai model atau parser sederhana.
 func (a *Agent) LLMEnabled() bool { return a.llm != nil }
 
-// Chat memproses satu pesan pengguna dari kanal tertentu (web atau telegram).
+// Chat handles one user message from a channel (web or telegram).
 func (a *Agent) Chat(ctx context.Context, channel, message string) (Reply, error) {
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -112,7 +107,7 @@ func (a *Agent) Chat(ctx context.Context, channel, message string) (Reply, error
 		Role:    "assistant",
 		Content: reply.Reply,
 	}); err != nil {
-		slog.Error("gagal menyimpan balasan chat", "error", err)
+		slog.Error("failed to store chat reply", "error", err)
 	}
 	return reply, nil
 }
@@ -188,7 +183,7 @@ func (a *Agent) chatWithParser(ctx context.Context, channel, message string) (Re
 	return Reply{Reply: reply, Undo: undoFromLog(toolLog), Source: sourceOf(false)}, nil
 }
 
-// undoFromLog mencari hasil add_transaction supaya UI bisa menawarkan Undo.
+// undoFromLog picks the add_transaction result out of the log so the UI can offer Undo.
 func undoFromLog(toolLog []map[string]any) *Undo {
 	for i := len(toolLog) - 1; i >= 0; i-- {
 		if name, _ := toolLog[i]["name"].(string); name != "add_transaction" {
@@ -212,7 +207,7 @@ func undoFromLog(toolLog []map[string]any) *Undo {
 	return nil
 }
 
-// Confirm menjalankan aksi berisiko yang sebelumnya ditahan.
+// Confirm runs a risky action that was held back for confirmation.
 func (a *Agent) Confirm(ctx context.Context, channel, actionID string) (Reply, error) {
 	action, err := a.loadPending(ctx, actionID)
 	if err != nil {
@@ -246,12 +241,11 @@ func (a *Agent) Confirm(ctx context.Context, channel, actionID string) (Reply, e
 		Role:    "assistant",
 		Content: reply,
 	}); err != nil {
-		slog.Error("gagal menyimpan balasan konfirmasi", "error", err)
+		slog.Error("failed to store confirmation reply", "error", err)
 	}
 	return Reply{Reply: reply, Source: sourceOf(a.llm != nil)}, nil
 }
 
-// Cancel membatalkan aksi berisiko yang menunggu konfirmasi.
 func (a *Agent) Cancel(ctx context.Context, actionID string) (Reply, error) {
 	action, err := a.loadPending(ctx, actionID)
 	if err != nil {
@@ -341,7 +335,7 @@ func (a *Agent) log(ctx context.Context, channel, userMessage, reply string, too
 		ToolCalls:   payload,
 		Reply:       pgtype.Text{String: reply, Valid: reply != ""},
 	}); err != nil {
-		slog.Error("gagal menulis agent_logs", "error", err)
+		slog.Error("failed to write agent_logs", "error", err)
 	}
 }
 
@@ -371,8 +365,8 @@ func normalizeChannel(channel string) string {
 
 type channelKey struct{}
 
-// withChannel menempelkan kanal percakapan ke context supaya tool mencatat
-// sumber transaksi dengan benar (web atau telegram).
+// withChannel carries the channel into the tool layer so transactions record
+// where they came from.
 func withChannel(ctx context.Context, channel string) context.Context {
 	return context.WithValue(ctx, channelKey{}, normalizeChannel(channel))
 }
@@ -399,7 +393,7 @@ func randomID() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// describeResult menyusun balasan manusiawi setelah aksi berisiko dijalankan.
+// describeResult turns a risky action's payload into a human reply.
 func describeResult(toolName string, result json.RawMessage) string {
 	switch toolName {
 	case "close_month":
@@ -434,6 +428,7 @@ func describeResult(toolName string, result json.RawMessage) string {
 	return "Selesai, sudah aku jalankan."
 }
 
+// friendlyError shows domain errors to the user as-is and hides the rest.
 func friendlyError(err error) string {
 	if domainErr := tools.AsError(err); domainErr != nil {
 		if len(domainErr.Available) > 0 {
@@ -441,7 +436,7 @@ func friendlyError(err error) string {
 		}
 		return domainErr.Message
 	}
-	slog.Error("agent gagal memproses pesan", "error", err)
+	slog.Error("agent failed to process message", "error", err)
 	return "Maaf, ada gangguan teknis saat memproses pesanmu. Coba lagi sebentar lagi ya."
 }
 

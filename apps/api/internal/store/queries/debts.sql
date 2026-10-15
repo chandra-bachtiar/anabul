@@ -10,11 +10,11 @@ SELECT
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
   (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
-  COALESCE(p.jumlah, 0)::bigint AS payment_count,
-  p.terakhir::timestamptz AS last_payment_at
+  COALESCE(p.payment_count, 0)::bigint AS payment_count,
+  p.last_paid_at::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  SELECT SUM(amount) AS paid, COUNT(*) AS payment_count, MAX(paid_at) AS last_paid_at
   FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE (sqlc.narg('status')::text IS NULL OR d.status = sqlc.narg('status'))
@@ -33,11 +33,11 @@ SELECT
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
   (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
-  COALESCE(p.jumlah, 0)::bigint AS payment_count,
-  p.terakhir::timestamptz AS last_payment_at
+  COALESCE(p.payment_count, 0)::bigint AS payment_count,
+  p.last_paid_at::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  SELECT SUM(amount) AS paid, COUNT(*) AS payment_count, MAX(paid_at) AS last_paid_at
   FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE d.id = $1;
@@ -83,8 +83,8 @@ UPDATE debts SET status = $2 WHERE id = $1;
 
 -- name: DebtTotals :one
 SELECT
-  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'hutang'), 0)::bigint AS hutang,
-  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'piutang'), 0)::bigint AS piutang
+  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'hutang'), 0)::bigint AS debt_total,
+  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'piutang'), 0)::bigint AS receivable_total
 FROM debts d
 LEFT JOIN LATERAL (
   SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id

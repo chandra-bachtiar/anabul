@@ -91,8 +91,8 @@ func (q *Queries) DebtPaidTotal(ctx context.Context, debtID int64) (int64, error
 
 const debtTotals = `-- name: DebtTotals :one
 SELECT
-  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'hutang'), 0)::bigint AS hutang,
-  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'piutang'), 0)::bigint AS piutang
+  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'hutang'), 0)::bigint AS debt_total,
+  COALESCE(SUM(d.amount_total - COALESCE(p.paid, 0)) FILTER (WHERE d.direction = 'piutang'), 0)::bigint AS receivable_total
 FROM debts d
 LEFT JOIN LATERAL (
   SELECT SUM(amount) AS paid FROM debt_payments WHERE debt_id = d.id
@@ -101,14 +101,14 @@ WHERE d.status = 'open'
 `
 
 type DebtTotalsRow struct {
-	Hutang  int64
-	Piutang int64
+	DebtTotal       int64
+	ReceivableTotal int64
 }
 
 func (q *Queries) DebtTotals(ctx context.Context) (DebtTotalsRow, error) {
 	row := q.db.QueryRow(ctx, debtTotals)
 	var i DebtTotalsRow
-	err := row.Scan(&i.Hutang, &i.Piutang)
+	err := row.Scan(&i.DebtTotal, &i.ReceivableTotal)
 	return i, err
 }
 
@@ -194,11 +194,11 @@ SELECT
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
   (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
-  COALESCE(p.jumlah, 0)::bigint AS payment_count,
-  p.terakhir::timestamptz AS last_payment_at
+  COALESCE(p.payment_count, 0)::bigint AS payment_count,
+  p.last_paid_at::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  SELECT SUM(amount) AS paid, COUNT(*) AS payment_count, MAX(paid_at) AS last_paid_at
   FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE d.id = $1
@@ -281,11 +281,11 @@ SELECT
   d.created_at,
   COALESCE(p.paid, 0)::bigint AS paid,
   (d.amount_total - COALESCE(p.paid, 0))::bigint AS remaining,
-  COALESCE(p.jumlah, 0)::bigint AS payment_count,
-  p.terakhir::timestamptz AS last_payment_at
+  COALESCE(p.payment_count, 0)::bigint AS payment_count,
+  p.last_paid_at::timestamptz AS last_payment_at
 FROM debts d
 LEFT JOIN LATERAL (
-  SELECT SUM(amount) AS paid, COUNT(*) AS jumlah, MAX(paid_at) AS terakhir
+  SELECT SUM(amount) AS paid, COUNT(*) AS payment_count, MAX(paid_at) AS last_paid_at
   FROM debt_payments WHERE debt_id = d.id
 ) p ON true
 WHERE ($1::text IS NULL OR d.status = $1)

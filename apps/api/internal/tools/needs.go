@@ -12,7 +12,6 @@ import (
 	"anabul/internal/store"
 )
 
-// ListRecurringNeeds mengembalikan template kebutuhan bulanan.
 func (s *Service) ListRecurringNeeds(ctx context.Context) ([]RecurringNeedRow, error) {
 	rows, err := s.q.ListRecurringNeeds(ctx)
 	if err != nil {
@@ -33,7 +32,6 @@ func (s *Service) ListRecurringNeeds(ctx context.Context) ([]RecurringNeedRow, e
 	return result, nil
 }
 
-// CreateRecurringNeed menambah template kebutuhan bulanan.
 func (s *Service) CreateRecurringNeed(ctx context.Context, name string, amount int64, dueDay int, categoryID *int64) (RecurringNeedRow, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -73,7 +71,6 @@ func (s *Service) CreateRecurringNeed(ctx context.Context, name string, amount i
 	}, nil
 }
 
-// UpdateRecurringNeedInput adalah perubahan template kebutuhan.
 type UpdateRecurringNeedInput struct {
 	ID         int64
 	Name       *string
@@ -83,7 +80,6 @@ type UpdateRecurringNeedInput struct {
 	Active     *bool
 }
 
-// UpdateRecurringNeed mengubah template kebutuhan bulanan.
 func (s *Service) UpdateRecurringNeed(ctx context.Context, in UpdateRecurringNeedInput) (RecurringNeedRow, error) {
 	if in.Amount != nil && *in.Amount < 0 {
 		return RecurringNeedRow{}, invalid("nominal tidak boleh negatif")
@@ -125,7 +121,7 @@ func (s *Service) UpdateRecurringNeed(ctx context.Context, in UpdateRecurringNee
 	}, nil
 }
 
-// DeleteRecurringNeed menghapus template tanpa menghapus riwayat bulan lalu.
+// DeleteRecurringNeed keeps the monthly history: only the template goes away.
 func (s *Service) DeleteRecurringNeed(ctx context.Context, id int64) error {
 	return s.InTx(ctx, func(q *store.Queries) error {
 		if err := q.DetachRecurringNeedFromMonthlyNeeds(ctx, int8Ptr(&id)); err != nil {
@@ -135,7 +131,6 @@ func (s *Service) DeleteRecurringNeed(ctx context.Context, id int64) error {
 	})
 }
 
-// GenerateMonthlyNeeds membuat daftar kebutuhan bulan dari template yang aktif.
 func (s *Service) GenerateMonthlyNeeds(ctx context.Context, monthArg string) (int64, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -158,7 +153,6 @@ func (s *Service) countNeeds(ctx context.Context, month time.Time) (int64, error
 	return int64(len(rows)), nil
 }
 
-// ListMonthlyNeeds mengembalikan kebutuhan bulanan pada satu bulan.
 func (s *Service) ListMonthlyNeeds(ctx context.Context, monthArg, status string) ([]NeedRow, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -184,7 +178,7 @@ func (s *Service) listMonthlyNeeds(ctx context.Context, month time.Time, status 
 	return result, nil
 }
 
-// MarkNeedPaid menandai kebutuhan lunas dan membuat transaksi pengeluarannya.
+// MarkNeedPaid books the expense and the status change in one transaction.
 func (s *Service) MarkNeedPaid(ctx context.Context, needID int64, amount *int64) (NeedRow, error) {
 	need, err := s.q.GetMonthlyNeed(ctx, needID)
 	if err != nil {
@@ -237,7 +231,7 @@ func (s *Service) MarkNeedPaid(ctx context.Context, needID int64, amount *int64)
 		updated.TransactionID, need.CategoryID, need.CategoryName, StartOfDay(s.Now(), s.loc)), nil
 }
 
-// UnmarkNeedPaid membatalkan status lunas (transaksi yang dibuat tidak dihapus).
+// UnmarkNeedPaid clears the status only; the expense it created stays.
 func (s *Service) UnmarkNeedPaid(ctx context.Context, needID int64) (NeedRow, error) {
 	need, err := s.q.GetMonthlyNeed(ctx, needID)
 	if err != nil {
@@ -260,7 +254,6 @@ func (s *Service) UnmarkNeedPaid(ctx context.Context, needID int64) (NeedRow, er
 		updated.TransactionID, updated.CategoryID, updated.CategoryName, StartOfDay(s.Now(), s.loc)), nil
 }
 
-// FindNeedByName mencari kebutuhan pada bulan berjalan berdasarkan nama.
 func (s *Service) FindNeedByName(ctx context.Context, month time.Time, name string) (NeedRow, error) {
 	row, err := s.q.FindMonthlyNeedByName(ctx, store.FindMonthlyNeedByNameParams{
 		MonthStart: dateOf(month),

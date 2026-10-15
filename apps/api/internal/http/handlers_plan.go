@@ -270,17 +270,17 @@ func (s *Server) handleCreateDebtPayment(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	// Secara bawaan pembayaran ikut dicatat sebagai transaksi supaya arus kas
-	// bulan itu terhitung; bisa dimatikan dengan record_transaction: false.
-	catatTransaksi := true
+	// A payment is booked as a transaction by default so the month's cash flow
+	// counts it; record_transaction: false turns that off.
+	recordTransaction := true
 	if payload.RecordTransaction != nil {
-		catatTransaksi = *payload.RecordTransaction
+		recordTransaction = *payload.RecordTransaction
 	}
 	debt, err := s.tools.AddDebtPayment(r.Context(), tools.AddDebtPaymentInput{
-		DebtID:         &id,
-		Amount:         payload.Amount,
-		PaidAt:         paidAt,
-		CatatTransaksi: catatTransaksi,
+		DebtID:            &id,
+		Amount:            payload.Amount,
+		PaidAt:            paidAt,
+		RecordTransaction: recordTransaction,
 	})
 	if err != nil {
 		writeError(w, err)

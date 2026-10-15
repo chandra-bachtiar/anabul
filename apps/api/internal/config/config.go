@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Config adalah seluruh konfigurasi aplikasi yang dibaca dari environment.
+// Config is the full application configuration read from the environment.
 type Config struct {
 	Port        int
 	Timezone    string
@@ -16,16 +16,16 @@ type Config struct {
 
 	AppPasswordHash string
 	SessionSecret   string
-	// SessionSecretPrevious menerima cookie yang ditandatangani dengan secret
-	// lama, dipakai saat rotasi SESSION_SECRET tanpa memaksa login ulang.
+	// SessionSecretPrevious accepts cookies signed with the old secret, used
+	// when rotating SESSION_SECRET without forcing a re-login.
 	SessionSecretPrevious string
 
-	// TrustProxy menandai server berada di belakang reverse proxy, sehingga
-	// header X-Forwarded-For dan X-Forwarded-Proto boleh dipercaya.
+	// TrustProxy marks the server as running behind a reverse proxy, so the
+	// X-Forwarded-For and X-Forwarded-Proto headers may be trusted.
 	TrustProxy bool
 
-	// AlertWebhookURL menerima notifikasi singkat saat terjadi error 5xx
-	// atau kegagalan start. Kosong = notifikasi dimatikan.
+	// AlertWebhookURL receives short notifications on 5xx errors or a failed
+	// start. Empty disables notifications.
 	AlertWebhookURL string
 
 	LLMBaseURL string
@@ -37,17 +37,17 @@ type Config struct {
 	TelegramOwnerChatID   string
 }
 
-// Load membaca environment dan memvalidasi nilai yang dipakai aplikasi.
+// Load reads the environment and validates the values the app uses.
 func Load() (Config, error) {
 	rawPort := env("PORT", "8080")
 	port, err := strconv.Atoi(rawPort)
 	if err != nil {
-		return Config{}, fmt.Errorf("PORT %q bukan angka", rawPort)
+		return Config{}, fmt.Errorf("PORT %q is not a number", rawPort)
 	}
 
 	tz := env("TZ", "Asia/Jakarta")
 	if _, err := time.LoadLocation(tz); err != nil {
-		return Config{}, fmt.Errorf("TZ %q tidak dikenal: %w", tz, err)
+		return Config{}, fmt.Errorf("unknown TZ %q: %w", tz, err)
 	}
 
 	trustProxy, err := envBool("TRUST_PROXY", false)
@@ -90,7 +90,7 @@ func envBool(key string, fallback bool) (bool, error) {
 	}
 	value, err := strconv.ParseBool(raw)
 	if err != nil {
-		return false, fmt.Errorf("%s %q bukan true/false", key, raw)
+		return false, fmt.Errorf("%s %q is not true/false", key, raw)
 	}
 	return value, nil
 }

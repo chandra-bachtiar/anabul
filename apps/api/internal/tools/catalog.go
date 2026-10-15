@@ -10,7 +10,6 @@ import (
 	"anabul/internal/store"
 )
 
-// ListCategories mengembalikan semua kategori beserta keyword-nya.
 func (s *Service) ListCategories(ctx context.Context) ([]Category, error) {
 	rows, err := s.q.ListCategories(ctx)
 	if err != nil {
@@ -23,7 +22,7 @@ func (s *Service) ListCategories(ctx context.Context) ([]Category, error) {
 	return result, nil
 }
 
-// CategoryNames adalah daftar nama kategori untuk pesan bantuan.
+// CategoryNames feeds the "did you mean" list in error messages.
 func (s *Service) CategoryNames(ctx context.Context) ([]string, error) {
 	rows, err := s.q.ListCategories(ctx)
 	if err != nil {
@@ -36,7 +35,6 @@ func (s *Service) CategoryNames(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// CreateCategory menambah kategori baru.
 func (s *Service) CreateCategory(ctx context.Context, name string, keywords []string) (Category, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -55,7 +53,6 @@ func (s *Service) CreateCategory(ctx context.Context, name string, keywords []st
 	return Category{ID: row.ID, Name: row.Name, Keywords: row.Keywords}, nil
 }
 
-// UpdateCategory mengubah nama atau keyword kategori.
 func (s *Service) UpdateCategory(ctx context.Context, id int64, name *string, keywords *[]string) (Category, error) {
 	if name != nil {
 		trimmed := strings.TrimSpace(*name)
@@ -81,8 +78,8 @@ func (s *Service) UpdateCategory(ctx context.Context, id int64, name *string, ke
 	return Category{ID: row.ID, Name: row.Name, Keywords: row.Keywords}, nil
 }
 
-// DeleteCategory menghapus kategori dan melepasnya dari transaksi, budget, dan
-// kebutuhan bulanan supaya tidak ada data yang ikut terhapus.
+// DeleteCategory detaches the category from transactions, budgets, and
+// recurring needs so none of that data is deleted along with it.
 func (s *Service) DeleteCategory(ctx context.Context, id int64) error {
 	category, err := s.getCategory(ctx, s.q, id)
 	if err != nil {
@@ -102,7 +99,6 @@ func (s *Service) DeleteCategory(ctx context.Context, id int64) error {
 	})
 }
 
-// ListAccounts mengembalikan semua akun.
 func (s *Service) ListAccounts(ctx context.Context) ([]Account, error) {
 	rows, err := s.q.ListAccounts(ctx)
 	if err != nil {
@@ -115,7 +111,6 @@ func (s *Service) ListAccounts(ctx context.Context) ([]Account, error) {
 	return result, nil
 }
 
-// CreateAccount menambah akun baru (cash, bank, e-wallet, ...).
 func (s *Service) CreateAccount(ctx context.Context, name string) (Account, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -153,8 +148,8 @@ func (s *Service) getAccount(ctx context.Context, q *store.Queries, id int64) (*
 	return &row, nil
 }
 
-// resolveCategory memilih kategori dari id, nama, atau tebakan keyword dari
-// catatan. Semua jalur mengembalikan nil kalau tidak ada yang cocok.
+// resolveCategory takes an id, a name, or a keyword guess from the note. Every
+// path returns nil when nothing matches.
 func (s *Service) resolveCategory(ctx context.Context, q *store.Queries, id *int64, name, note string) (*store.Category, error) {
 	if id != nil {
 		return s.getCategory(ctx, q, *id)

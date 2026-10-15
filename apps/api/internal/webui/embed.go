@@ -17,8 +17,8 @@ func init() {
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
-// Handler menyajikan hasil build frontend. Path yang bukan file dijawab
-// index.html supaya routing SPA tetap jalan, kecuali permintaan aset.
+// Handler serves the frontend build, falling back to index.html for non-file
+// paths so SPA routing works; asset requests are excluded.
 func Handler() http.Handler {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
@@ -40,8 +40,8 @@ func Handler() http.Handler {
 		}
 
 		if info, statErr := fs.Stat(sub, p); statErr == nil && !info.IsDir() {
-			// index.html dan service worker tidak boleh di-cache lama: setelah
-			// build baru, berkas lama menunjuk aset yang sudah tidak ada.
+			// index.html and the service worker must not be cached for long:
+			// after a new build the old copy points at assets that are gone.
 			if p == "index.html" || p == "sw.js" {
 				w.Header().Set("Cache-Control", "no-cache")
 			}
@@ -49,9 +49,8 @@ func Handler() http.Handler {
 			return
 		}
 
-		// Aset yang hilang dijawab 404, bukan index.html. Kalau HTML dikirim
-		// sebagai jawaban permintaan .js atau .css, browser menolaknya dengan
-		// error MIME dan halaman jadi kosong.
+		// A missing asset must be 404, never index.html: an HTML body for a .js
+		// or .css request is rejected by the browser as a MIME error.
 		if isAssetRequest(p) {
 			http.NotFound(w, r)
 			return
@@ -67,8 +66,8 @@ func Handler() http.Handler {
 	})
 }
 
-// isAssetRequest menandai permintaan berkas statis: folder build Vite, atau
-// path apa pun yang punya ekstensi selain .html.
+// isAssetRequest reports static file requests: the Vite build folder, or any
+// path with an extension other than .html.
 func isAssetRequest(p string) bool {
 	if strings.HasPrefix(p, "_app/") {
 		return true

@@ -35,12 +35,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cocok, err := s.auth.Verify(r.Context(), payload.Password)
+	match, err := s.auth.Verify(r.Context(), payload.Password)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	if !cocok {
+	if !match {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "password salah"})
 		return
 	}
@@ -65,7 +65,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// handleMe dipakai frontend untuk memeriksa sesi dan menyarankan ganti password.
+// handleMe lets the frontend check the session and suggest a password change.
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if !s.authenticated(r) {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -88,7 +88,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleChangePassword mengganti password aplikasi dari dalam app.
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	key := s.clientKey(r)
 	now := s.now()
@@ -122,7 +121,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// refreshSession memperpanjang cookie kalau umurnya hampir habis.
+// refreshSession extends the cookie once it gets close to expiring.
 func (s *Server) refreshSession(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookie)
 	if err != nil {

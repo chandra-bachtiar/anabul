@@ -19,21 +19,21 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 		return
 	}
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		slog.Error("gagal menulis respons json", "error", err)
+		slog.Error("failed to write the json response", "error", err)
 	}
 }
 
-// writeError memetakan error domain ke status HTTP dan pesan JSON.
+// writeError maps a domain error onto an HTTP status and a JSON body.
 func writeError(w http.ResponseWriter, err error) {
 	if domainErr := tools.AsError(err); domainErr != nil {
 		writeJSON(w, tools.HTTPStatus(err), domainErr)
 		return
 	}
-	slog.Error("error internal", "error", err)
+	slog.Error("internal error", "error", err)
 	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ada gangguan di server, coba lagi ya"})
 }
 
-// decodeJSON membaca body JSON dengan batas ukuran dan menolak field asing.
+// decodeJSON caps the body size and rejects unknown fields.
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	decoder := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes))
 	decoder.DisallowUnknownFields()

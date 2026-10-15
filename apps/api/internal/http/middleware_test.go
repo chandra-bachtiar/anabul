@@ -25,127 +25,127 @@ func TestSecurityHeaders(t *testing.T) {
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
 
 	header := recorder.Header()
-	for nama, ingin := range map[string]string{
+	for name, want := range map[string]string{
 		"X-Content-Type-Options":     "nosniff",
 		"Referrer-Policy":            "no-referrer",
 		"X-Frame-Options":            "DENY",
 		"Cross-Origin-Opener-Policy": "same-origin",
 	} {
-		if got := header.Get(nama); got != ingin {
-			t.Fatalf("header %s = %q, ingin %q", nama, got, ingin)
+		if got := header.Get(name); got != want {
+			t.Fatalf("header %s = %q, want %q", name, got, want)
 		}
 	}
 
 	csp := header.Get("Content-Security-Policy")
 	if csp == "" {
-		t.Fatal("CSP harus terpasang")
+		t.Fatal("the CSP header must be set")
 	}
 	if !strings.Contains(csp, "script-src 'self' 'sha256-abc123'") {
-		t.Fatalf("CSP harus memuat hash skrip inline, dapat %q", csp)
+		t.Fatalf("the CSP must carry the inline script hash, got %q", csp)
 	}
 	if strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
-		t.Fatal("script-src tidak boleh memakai unsafe-inline")
+		t.Fatal("script-src must not use unsafe-inline")
 	}
 	if !strings.Contains(csp, "frame-ancestors 'none'") {
-		t.Fatalf("CSP harus melarang iframe, dapat %q", csp)
+		t.Fatalf("the CSP must forbid iframes, got %q", csp)
 	}
 }
 
-func TestAlertHanyaUntukErrorServer(t *testing.T) {
-	var terkirim []string
+func TestAlertOnlyForServerErrors(t *testing.T) {
+	var sent []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		terkirim = append(terkirim, r.URL.Path)
+		sent = append(sent, r.URL.Path)
 	}))
 	defer server.Close()
 
-	// Notifier async; panggil langsung lewat s.alert supaya bisa diperiksa.
+	// The notifier posts asynchronously; going through s.alert keeps the check
+	// synchronous.
 	serverHTTP := New(Deps{Cfg: config.Config{}, Alert: alert.New(server.URL)})
 
 	cases := []struct {
-		nama       string
+		name       string
 		status     int
 		path       string
-		harusKirim bool
+		shouldSend bool
 	}{
-		{nama: "5xx dikirim", status: http.StatusInternalServerError, path: "/api/transactions", harusKirim: true},
-		{nama: "4xx tidak dikirim", status: http.StatusBadRequest, path: "/api/transactions", harusKirim: false},
-		{nama: "healthz dikecualikan", status: http.StatusInternalServerError, path: "/healthz", harusKirim: false},
+		{name: "5xx is sent", status: http.StatusInternalServerError, path: "/api/transactions", shouldSend: true},
+		{name: "4xx is not sent", status: http.StatusBadRequest, path: "/api/transactions", shouldSend: false},
+		{name: "healthz is excluded", status: http.StatusInternalServerError, path: "/healthz", shouldSend: false},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.nama, func(t *testing.T) {
-			terkirim = nil
+		t.Run(tc.name, func(t *testing.T) {
+			sent = nil
 			handler := serverHTTP.alertOnServerError(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.status)
 			}))
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tc.path, nil))
 
-			// Kirim() berjalan sinkron, jadi hasilnya sudah bisa dibaca.
-			if tc.harusKirim && len(terkirim) == 0 {
-				t.Fatal("alert harus dikirim untuk error 5xx")
+			if tc.shouldSend && len(sent) == 0 {
+				t.Fatal("a 5xx must trigger an alert")
 			}
-			if !tc.harusKirim && len(terkirim) > 0 {
-				t.Fatalf("alert tidak boleh dikirim, tapi terkirim %d kali", len(terkirim))
+			if !tc.shouldSend && len(sent) > 0 {
+				t.Fatalf("no alert expected, but %d were sent", len(sent))
 			}
 		})
 	}
 }
 
-func TestClientKeyHormatiTrustProxy(t *testing.T) {
+func TestClientKeyRespectsTrustProxy(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	request.RemoteAddr = "10.0.0.9:5555"
 	request.Header.Set("X-Forwarded-For", "203.0.113.7, 10.0.0.1")
 
-	tanpaProxy := New(Deps{Cfg: config.Config{}})
-	if got := tanpaProxy.clientKey(request); got != "10.0.0.9" {
-		t.Fatalf("tanpa TRUST_PROXY = %q, ingin alamat koneksi langsung", got)
+	withoutProxy := New(Deps{Cfg: config.Config{}})
+	if got := withoutProxy.clientKey(request); got != "10.0.0.9" {
+		t.Fatalf("without TRUST_PROXY = %q, want the connection address", got)
 	}
 
-	denganProxy := New(Deps{Cfg: config.Config{TrustProxy: true}})
-	if got := denganProxy.clientKey(request); got != "203.0.113.7" {
-		t.Fatalf("dengan TRUST_PROXY = %q, ingin alamat asli dari header", got)
+	withProxy := New(Deps{Cfg: config.Config{TrustProxy: true}})
+	if got := withProxy.clientKey(request); got != "203.0.113.7" {
+		t.Fatalf("with TRUST_PROXY = %q, want the forwarded address", got)
 	}
 }
 
-func TestSecureRequestIkutTrustProxy(t *testing.T) {
+func TestSecureRequestFollowsTrustProxy(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	request.Header.Set("X-Forwarded-Proto", "https")
 
-	tanpaProxy := New(Deps{Cfg: config.Config{}})
-	if tanpaProxy.secureRequest(request) {
-		t.Fatal("tanpa TRUST_PROXY, header X-Forwarded-Proto tidak boleh dipercaya")
+	withoutProxy := New(Deps{Cfg: config.Config{}})
+	if withoutProxy.secureRequest(request) {
+		t.Fatal("without TRUST_PROXY, X-Forwarded-Proto must not be trusted")
 	}
 
-	denganProxy := New(Deps{Cfg: config.Config{TrustProxy: true}})
-	if !denganProxy.secureRequest(request) {
-		t.Fatal("dengan TRUST_PROXY, permintaan HTTPS lewat proxy harus dikenali")
+	withProxy := New(Deps{Cfg: config.Config{TrustProxy: true}})
+	if !withProxy.secureRequest(request) {
+		t.Fatal("with TRUST_PROXY, a proxied HTTPS request must be recognised")
 	}
 }
 
-func TestRotasiSessionSecret(t *testing.T) {
+func TestSessionSecretRotation(t *testing.T) {
 	now := time.Now()
-	lama := newSessionManager("secret-lama", "")
-	cookieLama := lama.issue(now)
+	old := newSessionManager("old-secret", "")
+	oldCookie := old.issue(now)
 
-	baru := newSessionManager("secret-baru", "secret-lama")
-	if _, err := baru.verify(cookieLama, now); err != nil {
-		t.Fatalf("cookie dari secret lama harus tetap diterima saat rotasi: %v", err)
+	fresh := newSessionManager("new-secret", "old-secret")
+	if _, err := fresh.verify(oldCookie, now); err != nil {
+		t.Fatalf("a cookie from the old secret must still verify during rotation: %v", err)
 	}
 
-	cookieBaru := baru.issue(now)
-	if _, err := baru.verify(cookieBaru, now); err != nil {
-		t.Fatalf("cookie baru harus valid: %v", err)
+	newCookie := fresh.issue(now)
+	if _, err := fresh.verify(newCookie, now); err != nil {
+		t.Fatalf("a fresh cookie must verify: %v", err)
 	}
 
-	// Cookie baru tidak boleh valid di server lama.
-	if _, err := lama.verify(cookieBaru, now); err == nil {
-		t.Fatal("cookie bertanda tangan secret baru tidak boleh lolos di secret lama")
+	// Cookies signed with the new secret stay invalid on the old server.
+	if _, err := old.verify(newCookie, now); err == nil {
+		t.Fatal("a cookie signed with the new secret must not pass the old one")
 	}
 
-	// Tanpa secret sebelumnya, cookie lama ditolak.
-	tanpa := newSessionManager("secret-baru", "")
-	if _, err := tanpa.verify(cookieLama, now); err == nil {
-		t.Fatal("tanpa SESSION_SECRET_PREVIOUS, cookie lama harus ditolak")
+	// Without the previous secret, old cookies are rejected.
+	withoutPrevious := newSessionManager("new-secret", "")
+	if _, err := withoutPrevious.verify(oldCookie, now); err == nil {
+		t.Fatal("without SESSION_SECRET_PREVIOUS, old cookies must be rejected")
 	}
 }

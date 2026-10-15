@@ -7,7 +7,6 @@ import (
 	"anabul/internal/store"
 )
 
-// ListBudgets mengembalikan budget satu bulan beserta pemakaiannya.
 func (s *Service) ListBudgets(ctx context.Context, monthArg string) ([]BudgetRow, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -28,7 +27,6 @@ func (s *Service) listBudgets(ctx context.Context, month time.Time) ([]BudgetRow
 	return result, nil
 }
 
-// SetBudget menyimpan nominal budget satu kategori pada satu bulan.
 func (s *Service) SetBudget(ctx context.Context, monthArg string, categoryID int64, amount int64) (BudgetRow, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {
@@ -65,7 +63,6 @@ func (s *Service) upsertBudget(ctx context.Context, month time.Time, categoryID 
 	return budgetRow(categoryID, categoryName, amount, spent), nil
 }
 
-// CopyBudgets menyalin budget dari satu bulan ke bulan lain.
 func (s *Service) CopyBudgets(ctx context.Context, fromArg, toArg string) (int64, error) {
 	from, err := s.ParseMonthArg(fromArg)
 	if err != nil {
@@ -91,7 +88,6 @@ func (s *Service) CopyBudgets(ctx context.Context, fromArg, toArg string) (int64
 	return int64(len(rows)), nil
 }
 
-// BudgetOverview adalah total budget dan pemakaiannya pada satu bulan.
 type BudgetOverview struct {
 	Total        int64
 	Spent        int64
@@ -148,7 +144,7 @@ func (s *Service) budgetOverview(ctx context.Context, month time.Time) (BudgetOv
 	return overview, nil
 }
 
-// categorySpendRows menggabungkan pengeluaran bulan dengan budget yang ada.
+// Unbudgeted spending still counts towards the month totals but carries no budget row.
 func (s *Service) categorySpendRows(ctx context.Context, month time.Time) ([]CategorySpend, error) {
 	overview, err := s.budgetOverview(ctx, month)
 	if err != nil {

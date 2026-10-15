@@ -13,8 +13,8 @@ import (
 //go:embed *.sql
 var files embed.FS
 
-// Up menjalankan semua migrasi yang belum diterapkan. File migrasi di-embed
-// ke binary supaya image runtime tidak perlu membawa folder migrations.
+// Up runs all migrations that have not been applied yet. Migration files are
+// embedded so the runtime image does not need the migrations folder.
 func Up(ctx context.Context, pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
@@ -22,10 +22,10 @@ func Up(ctx context.Context, pool *pgxpool.Pool) error {
 	goose.SetBaseFS(files)
 	goose.SetLogger(goose.NopLogger())
 	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("set dialek goose: %w", err)
+		return fmt.Errorf("set goose dialect: %w", err)
 	}
 	if err := goose.UpContext(ctx, db, "."); err != nil {
-		return fmt.Errorf("jalankan migrasi: %w", err)
+		return fmt.Errorf("run migrations: %w", err)
 	}
 	return nil
 }

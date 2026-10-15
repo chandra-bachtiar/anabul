@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// llmClient adalah klien tipis ke endpoint OpenAI-compatible.
+// llmClient is a thin client for any OpenAI-compatible endpoint.
 type llmClient struct {
 	baseURL string
 	apiKey  string
@@ -66,7 +66,7 @@ type chatResponse struct {
 	} `json:"error"`
 }
 
-// complete mengirim percakapan ke model dan mengembalikan pesan balasannya.
+// complete sends the conversation to the model and returns its reply message.
 func (c *llmClient) complete(ctx context.Context, messages []chatMessage, toolSchemas []toolSchema) (chatMessage, error) {
 	payload := chatRequest{
 		Model:       c.model,
@@ -80,12 +80,12 @@ func (c *llmClient) complete(ctx context.Context, messages []chatMessage, toolSc
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return chatMessage{}, fmt.Errorf("encode request llm: %w", err)
+		return chatMessage{}, fmt.Errorf("encode llm request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return chatMessage{}, fmt.Errorf("buat request llm: %w", err)
+		return chatMessage{}, fmt.Errorf("build llm request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.apiKey != "" {
@@ -94,27 +94,27 @@ func (c *llmClient) complete(ctx context.Context, messages []chatMessage, toolSc
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return chatMessage{}, fmt.Errorf("panggil llm: %w", err)
+		return chatMessage{}, fmt.Errorf("call llm: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return chatMessage{}, fmt.Errorf("baca respons llm: %w", err)
+		return chatMessage{}, fmt.Errorf("read llm response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return chatMessage{}, fmt.Errorf("llm membalas %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		return chatMessage{}, fmt.Errorf("llm answered %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
 	}
 
 	var parsed chatResponse
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return chatMessage{}, fmt.Errorf("decode respons llm: %w", err)
+		return chatMessage{}, fmt.Errorf("decode llm response: %w", err)
 	}
 	if parsed.Error != nil {
 		return chatMessage{}, fmt.Errorf("llm error: %s", parsed.Error.Message)
 	}
 	if len(parsed.Choices) == 0 {
-		return chatMessage{}, fmt.Errorf("llm tidak mengembalikan pilihan jawaban")
+		return chatMessage{}, fmt.Errorf("llm returned no choice")
 	}
 	return parsed.Choices[0].Message, nil
 }

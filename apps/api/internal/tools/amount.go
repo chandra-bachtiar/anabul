@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// Status budget yang dipakai UI (warna) dan agent (kalimat singkat).
+// Budget status drives the UI colour and the agent's one-liner.
 const (
 	StatusOK   = "ok"
 	StatusWarn = "warn"
@@ -19,15 +19,15 @@ const (
 )
 
 const (
-	moodSenang   = "senang"
-	moodKhawatir = "khawatir"
-	moodTidur    = "tidur"
+	moodHappy   = "happy"
+	moodWorried = "worried"
+	moodAsleep  = "asleep"
 )
 
 var amountPattern = regexp.MustCompile(`[0-9][0-9.,]*`)
 
-// ParseAmount membaca nominal dari teks bebas: "25000", "25.000", "25rb",
-// "5jt", "Rp 12 500", "1,5jt". Dipakai parser Telegram dan validasi tool.
+// ParseAmount reads a nominal from free text: "25000", "25.000", "25rb", "5jt",
+// "Rp 12 500", "1,5jt".
 func ParseAmount(raw string) (int64, error) {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	if s == "" {
@@ -62,8 +62,8 @@ func ParseAmount(raw string) (int64, error) {
 	return total, nil
 }
 
-// parseDigits menangani pemisah ribuan Indonesia ("25.000", "1.500.000") dan
-// desimal ("1,5" atau "1.5" saat ada satuan juta/ribu).
+// parseDigits separates Indonesian thousands ("25.000") from decimals ("1,5"),
+// where "1.5" only counts as a decimal next to a juta/ribu suffix.
 func parseDigits(digits string, multiplier int64) (float64, error) {
 	hasComma := strings.Contains(digits, ",")
 	hasDot := strings.Contains(digits, ".")
@@ -90,7 +90,6 @@ func parseDigits(digits string, multiplier int64) (float64, error) {
 	return value, nil
 }
 
-// ParseMonth membaca bulan "YYYY-MM"; kosong berarti bulan berjalan.
 func ParseMonth(raw string, now time.Time, loc *time.Location) (time.Time, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -103,28 +102,24 @@ func ParseMonth(raw string, now time.Time, loc *time.Location) (time.Time, error
 	return parsed, nil
 }
 
-// MonthStart membulatkan waktu ke tanggal 1 bulan tersebut di zona lokasi.
 func MonthStart(t time.Time, loc *time.Location) time.Time {
 	local := t.In(loc)
 	return time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc)
 }
 
-// MonthEnd adalah tanggal 1 bulan berikutnya (eksklusif).
+// MonthEnd returns the first day of the next month, exclusive.
 func MonthEnd(month time.Time) time.Time {
 	return month.AddDate(0, 1, 0)
 }
 
-// FormatMonth menulis bulan sebagai "YYYY-MM".
 func FormatMonth(month time.Time) string {
 	return month.Format("2006-01")
 }
 
-// FormatMonthLabel menulis bulan sebagai "Oktober 2026".
 func FormatMonthLabel(month time.Time) string {
 	return month.Format("January 2006")
 }
 
-// BudgetStatus menentukan status warna dari budget vs pemakaian.
 func BudgetStatus(amount, spent int64) string {
 	switch {
 	case amount <= 0:
@@ -138,22 +133,23 @@ func BudgetStatus(amount, spent int64) string {
 	}
 }
 
-// BudgetRemaining menghitung sisa; boleh negatif kalau lewat.
+// BudgetRemaining goes negative once spending passes the budget.
 func BudgetRemaining(amount, spent int64) int64 { return amount - spent }
 
-// Mood maskot di Home: tidur saat bulan terkunci, khawatir saat budget
-// menipis/lewat, selebihnya senang.
+// Mood picks the Home mascot: asleep for a closed month, worried when the
+// budget is nearly gone or a category already went over, happy otherwise.
 func Mood(locked bool, totalBudget, totalSpent int64, anyOver bool) string {
 	if locked {
-		return moodTidur
+		return moodAsleep
 	}
 	if anyOver || (totalBudget > 0 && totalSpent*100 >= totalBudget*80) {
-		return moodKhawatir
+		return moodWorried
 	}
-	return moodSenang
+	return moodHappy
 }
 
-// MatchCategory mencari kategori paling cocok untuk sebuah catatan.
+// MatchCategory guesses a category from a note, by category name first and then
+// by keyword.
 func MatchCategory(note string, candidates []Category) *Category {
 	lowered := strings.ToLower(note)
 	if strings.TrimSpace(lowered) == "" {
@@ -250,21 +246,13 @@ func dateValue(v pgtype.Date) *time.Time {
 	return &t
 }
 
-// timeValue mengubah pgtype.Timestamptz menjadi waktu di zona aplikasi.
+// timeValue converts a nullable timestamp into the application timezone.
 func timeValue(v pgtype.Timestamptz, loc *time.Location) *time.Time {
 	if !v.Valid {
 		return nil
 	}
 	t := v.Time.In(loc)
 	return &t
-}
-
-func textValue(v pgtype.Text) *string {
-	if !v.Valid {
-		return nil
-	}
-	s := v.String
-	return &s
 }
 
 func derefStrings(value *[]string) []string {
@@ -274,7 +262,7 @@ func derefStrings(value *[]string) []string {
 	return *value
 }
 
-// pgDateToTime mengubah pgtype.Date menjadi waktu lokal zona aplikasi.
+// pgDateToTime reads a date column as midnight in the application timezone.
 func pgDateToTime(v pgtype.Date, loc *time.Location) time.Time {
 	if !v.Valid {
 		return time.Time{}
@@ -282,14 +270,13 @@ func pgDateToTime(v pgtype.Date, loc *time.Location) time.Time {
 	return time.Date(v.Time.Year(), v.Time.Month(), v.Time.Day(), 0, 0, 0, 0, loc)
 }
 
-// StartOfDay membulatkan waktu ke pukul 00:00 di zona lokasi.
 func StartOfDay(t time.Time, loc *time.Location) time.Time {
 	local := t.In(loc)
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 }
 
-// DueDateFromDay menghitung tanggal jatuh tempo untuk hari ke-N, dibatasi ke
-// hari terakhir bulan tersebut (mis. due_day 31 di Februari).
+// DueDateFromDay clamps day N to the last day of the month, so a due_day of 31
+// still lands on 28/29/30 where the month is shorter.
 func DueDateFromDay(month time.Time, day int) time.Time {
 	last := MonthEnd(month).AddDate(0, 0, -1)
 	if day > last.Day() {
@@ -301,7 +288,7 @@ func DueDateFromDay(month time.Time, day int) time.Time {
 	return time.Date(month.Year(), month.Month(), day, 0, 0, 0, 0, month.Location())
 }
 
-// FormatAmount dipakai agent untuk menulis nominal: 25000 -> "Rp 25.000".
+// FormatAmount renders a nominal for the agent: 25000 -> "Rp 25.000".
 func FormatAmount(amount int64) string {
 	negative := amount < 0
 	if negative {
@@ -321,7 +308,8 @@ func FormatAmount(amount int64) string {
 	return formatted
 }
 
-// IsLocked menentukan status kunci dari baris month_closings.
+// IsLocked: a month counts as locked while the last closing is newer than the
+// last reopening.
 func IsLocked(closedAt, reopenedAt pgtype.Timestamptz) bool {
 	if !closedAt.Valid {
 		return false

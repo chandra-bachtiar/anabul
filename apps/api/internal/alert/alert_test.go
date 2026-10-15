@@ -11,16 +11,16 @@ import (
 	"time"
 )
 
-func TestKirimMengirimPesan(t *testing.T) {
+func TestSendDeliversMessages(t *testing.T) {
 	var mu sync.Mutex
-	var pesan []string
+	var messages []string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]string
 		_ = json.Unmarshal(body, &payload)
 		mu.Lock()
-		pesan = append(pesan, payload["text"])
+		messages = append(messages, payload["text"])
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -28,46 +28,46 @@ func TestKirimMengirimPesan(t *testing.T) {
 
 	notifier := New(server.URL)
 	if !notifier.Enabled() {
-		t.Fatal("notifier harus aktif saat url diisi")
+		t.Fatal("notifier must be enabled when a url is set")
 	}
 
 	ctx := context.Background()
-	notifier.Kirim(ctx, "error 500 di GET /api/x")
-	notifier.Kirim(ctx, "error 500 di GET /api/x") // pesan sama, harus ditahan
-	notifier.Kirim(ctx, "error 500 di GET /api/y")
+	notifier.Send(ctx, "error 500 on GET /api/x")
+	notifier.Send(ctx, "error 500 on GET /api/x") // duplicate, must be throttled
+	notifier.Send(ctx, "error 500 on GET /api/y")
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(pesan) != 2 {
-		t.Fatalf("pesan terkirim = %d, ingin 2 (yang sama ditahan): %v", len(pesan), pesan)
+	if len(messages) != 2 {
+		t.Fatalf("messages sent = %d, want 2 (the duplicate is throttled): %v", len(messages), messages)
 	}
-	if pesan[0] != "[ANABUL] error 500 di GET /api/x" {
-		t.Fatalf("pesan pertama = %q", pesan[0])
+	if messages[0] != "[ANABUL] error 500 on GET /api/x" {
+		t.Fatalf("first message = %q", messages[0])
 	}
 }
 
-func TestNotifierMatiTanpaURL(t *testing.T) {
+func TestNotifierDisabledWithoutURL(t *testing.T) {
 	notifier := New("")
 	if notifier.Enabled() {
-		t.Fatal("notifier tanpa url harus mati")
+		t.Fatal("notifier without a url must be disabled")
 	}
-	// Tidak boleh panik dan tidak mengirim apa pun.
-	notifier.Kirim(context.Background(), "apa saja")
+	// Must not panic and must not send anything.
+	notifier.Send(context.Background(), "anything")
 }
 
-func TestJedaMinimalBerlaku(t *testing.T) {
-	notifier := New("https://contoh.invalid/webhook")
-	if !notifier.bolehKirim("pesan") {
-		t.Fatal("kiriman pertama harus boleh")
+func TestMinIntervalApplies(t *testing.T) {
+	notifier := New("https://example.invalid/webhook")
+	if !notifier.shouldSend("message") {
+		t.Fatal("first send must be allowed")
 	}
-	if notifier.bolehKirim("pesan") {
-		t.Fatal("kiriman kedua dalam jeda harus ditahan")
+	if notifier.shouldSend("message") {
+		t.Fatal("second send within the interval must be throttled")
 	}
-	// Setelah jeda lewat, pesan yang sama boleh dikirim lagi.
+	// Once the interval has passed, the same message may be sent again.
 	notifier.mu.Lock()
-	notifier.terakhir["pesan"] = time.Now().Add(-jedaMinimal - time.Second)
+	notifier.lastSent["message"] = time.Now().Add(-minInterval - time.Second)
 	notifier.mu.Unlock()
-	if !notifier.bolehKirim("pesan") {
-		t.Fatal("setelah jeda lewat, kiriman harus boleh")
+	if !notifier.shouldSend("message") {
+		t.Fatal("after the interval has passed, the send must be allowed")
 	}
 }

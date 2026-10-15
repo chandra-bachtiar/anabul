@@ -3,12 +3,11 @@ package tools
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// Kode error dipakai REST API (HTTP status) dan agent (balasan terstruktur).
+// Error codes are shared by the REST API (HTTP status) and the agent (structured replies).
 const (
 	CodeInvalid      = "invalid"
 	CodeNotFound     = "not_found"
@@ -18,7 +17,7 @@ const (
 	CodeNeedsConfirm = "needs_confirmation"
 )
 
-// Error adalah error domain dengan pesan yang aman ditampilkan ke pengguna.
+// Error carries a message that is safe to show the user.
 type Error struct {
 	Code      string   `json:"code"`
 	Message   string   `json:"error"`
@@ -42,13 +41,13 @@ func locked(month string) *Error {
 	}
 }
 
-// WithAvailable melengkapi error dengan daftar pilihan yang valid.
+// WithAvailable lists the valid options so the user can pick one.
 func (e *Error) WithAvailable(items ...string) *Error {
 	e.Available = items
 	return e
 }
 
-// AsError mengambil *Error dari sebuah error (nil jika bukan error domain).
+// AsError returns the domain error, or nil when err is not one.
 func AsError(err error) *Error {
 	var e *Error
 	if errors.As(err, &e) {
@@ -57,8 +56,8 @@ func AsError(err error) *Error {
 	return nil
 }
 
-// NewInvalidError dan NewNotFoundError dipakai paket lain (agent) supaya pesan
-// validasi tetap seragam dengan layer tools.
+// NewInvalidError and NewNotFoundError keep validation errors from other
+// packages (agent) consistent with this layer.
 func NewInvalidError(format string, args ...any) *Error {
 	return invalid(format, args...)
 }
@@ -67,12 +66,11 @@ func NewNotFoundError(format string, args ...any) *Error {
 	return notFound(format, args...)
 }
 
-// NewConflictError menandai aksi yang bentrok dengan state sekarang.
 func NewConflictError(format string, args ...any) *Error {
 	return &Error{Code: CodeConflict, Message: fmt.Sprintf(format, args...)}
 }
 
-// HTTPStatus memetakan kode error ke status HTTP.
+// HTTPStatus maps a domain error code to an HTTP status.
 func HTTPStatus(err error) int {
 	e := AsError(err)
 	if e == nil {
@@ -92,11 +90,6 @@ func HTTPStatus(err error) int {
 	}
 }
 
-func joinNames(names []string) string {
-	return strings.Join(names, ", ")
-}
-
-// isUniqueViolation menandai pelanggaran constraint UNIQUE di PostgreSQL.
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

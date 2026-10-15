@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Dashboard merangkai semua yang dibutuhkan halaman Home.
 func (s *Service) Dashboard(ctx context.Context, monthArg string) (Dashboard, error) {
 	month, err := s.ParseMonthArg(monthArg)
 	if err != nil {

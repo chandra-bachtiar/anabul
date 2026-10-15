@@ -8,11 +8,10 @@ import (
 	"anabul/internal/alert"
 )
 
-// baseContentSecurityPolicy membatasi sumber daya ke origin sendiri. Frontend
-// ANABUL memuat semua aset dari server yang sama (font dan maskot ikut
-// di-embed), jadi tidak ada origin luar yang perlu diizinkan. 'unsafe-inline'
-// hanya untuk style karena Svelte menyisipkan gaya komponen; skrip inline
-// diizinkan lewat hash, bukan lewat unsafe-inline.
+// The app loads every asset from its own origin (fonts and mascots are
+// embedded), so no external origin needs allowing. 'unsafe-inline' is limited
+// to styles because Svelte injects component styles; inline scripts pass by hash
+// instead.
 const baseContentSecurityPolicy = "default-src 'self'; " +
 	"script-src 'self'{SCRIPT_HASHES}; " +
 	"style-src 'self' 'unsafe-inline'; " +
@@ -25,8 +24,8 @@ const baseContentSecurityPolicy = "default-src 'self'; " +
 	"frame-ancestors 'none'; " +
 	"object-src 'none'"
 
-// contentSecurityPolicy menyusun header CSP lengkap dengan hash skrip inline
-// dari build frontend yang sedang dilayani.
+// contentSecurityPolicy fills in the inline script hashes of the frontend build
+// being served.
 func (s *Server) contentSecurityPolicy() string {
 	hashes := ""
 	for _, hash := range s.scriptHashes {
@@ -35,7 +34,6 @@ func (s *Server) contentSecurityPolicy() string {
 	return strings.Replace(baseContentSecurityPolicy, "{SCRIPT_HASHES}", hashes, 1)
 }
 
-// securityHeaders menambahkan header pengaman ke semua respons.
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
@@ -49,7 +47,7 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// statusRecorder mencatat kode status untuk kebutuhan alert.
+// statusRecorder keeps the status code for the alerting middleware.
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -69,8 +67,8 @@ func (r *statusRecorder) Write(data []byte) (int, error) {
 	return r.ResponseWriter.Write(data)
 }
 
-// alertOnServerError mengirim notifikasi saat ada respons 5xx. Health check
-// dikecualikan supaya monitoring tidak menghasilkan spam.
+// alertOnServerError notifies on 5xx responses. Health checks are excluded so
+// monitoring does not turn into spam.
 func (s *Server) alertOnServerError(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.alert == nil || !s.alert.Enabled() {
@@ -82,14 +80,13 @@ func (s *Server) alertOnServerError(next http.Handler) http.Handler {
 		next.ServeHTTP(recorder, r)
 
 		if recorder.status >= 500 && r.URL.Path != "/healthz" {
-			s.alert.Kirim(context.WithoutCancel(r.Context()), alert.PesanServer(r.Method, r.URL.Path, recorder.status))
+			s.alert.Send(context.WithoutCancel(r.Context()), alert.ServerError(r.Method, r.URL.Path, recorder.status))
 		}
 	})
 }
 
-// clientKey menentukan kunci pembatas percobaan login. Header X-Forwarded-For
-// hanya dipercaya kalau server memang berada di belakang reverse proxy
-// (TRUST_PROXY), supaya tidak bisa dipalsukan untuk melewati rate limit.
+// clientKey is the rate limit key. X-Forwarded-For is only trusted behind a
+// reverse proxy (TRUST_PROXY), so a spoofed header cannot dodge the limit.
 func (s *Server) clientKey(r *http.Request) string {
 	if s.cfg.TrustProxy {
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -102,8 +99,7 @@ func (s *Server) clientKey(r *http.Request) string {
 	return remoteHost(r)
 }
 
-// secureRequest menentukan apakah permintaan datang lewat HTTPS, langsung atau
-// lewat proxy yang dipercaya.
+// secureRequest reports an HTTPS request, direct or through a trusted proxy.
 func (s *Server) secureRequest(r *http.Request) bool {
 	if r.TLS != nil {
 		return true

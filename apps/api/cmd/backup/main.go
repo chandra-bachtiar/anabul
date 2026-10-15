@@ -1,10 +1,5 @@
-// cmd/backup menyimpan dump database ke folder backups/ lalu menghapus
-// backup lama sesuai BACKUP_KEEP.
-//
-// Contoh:
-//
-//	go run ./cmd/backup
-//	BACKUP_DIR=D:\backup-anabul BACKUP_KEEP=30 go run ./cmd/backup
+// cmd/backup dumps the database into backups/ and prunes old dumps down to the
+// newest BACKUP_KEEP files, e.g. BACKUP_DIR=D:\backup-anabul go run ./cmd/backup.
 package main
 
 import (
@@ -23,15 +18,15 @@ import (
 )
 
 func main() {
-	if err := jalankan(); err != nil {
-		fmt.Fprintln(os.Stderr, "backup gagal:", err)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "backup failed:", err)
 		os.Exit(1)
 	}
 }
 
-func jalankan() error {
+func run() error {
 	if err := config.LoadDotEnv(); err != nil {
-		return fmt.Errorf("baca .env: %w", err)
+		return fmt.Errorf("read .env: %w", err)
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -41,38 +36,38 @@ func jalankan() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	if err := pgdump.Tersedia(ctx); err != nil {
+	if err := pgdump.Available(ctx); err != nil {
 		return err
 	}
 
 	dir := env("BACKUP_DIR", "backups")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("siapkan folder %s: %w", dir, err)
+		return fmt.Errorf("prepare folder %s: %w", dir, err)
 	}
 
-	nama := fmt.Sprintf("anabul-%s.sql.gz", time.Now().Format("20060102-150405"))
-	path := filepath.Join(dir, nama)
+	name := fmt.Sprintf("anabul-%s.sql.gz", time.Now().Format("20060102-150405"))
+	path := filepath.Join(dir, name)
 
 	file, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("buat berkas backup: %w", err)
+		return fmt.Errorf("create backup file: %w", err)
 	}
 	defer file.Close()
 
 	gz := gzip.NewWriter(file)
 	if err := pgdump.Dump(ctx, cfg.DatabaseURL, gz); err != nil {
 		file.Close()
-		// Jangan tinggalkan berkas setengah jadi supaya tidak dikira backup sah.
+		// Never leave a half-written file behind: it could pass for a valid backup.
 		_ = os.Remove(path)
 		return err
 	}
 	if err := gz.Close(); err != nil {
 		file.Close()
 		_ = os.Remove(path)
-		return fmt.Errorf("tutup gzip: %w", err)
+		return fmt.Errorf("close gzip: %w", err)
 	}
 	if err := file.Close(); err != nil {
-		return fmt.Errorf("tutup berkas: %w", err)
+		return fmt.Errorf("close file: %w", err)
 	}
 
 	info, err := os.Stat(path)
@@ -81,22 +76,22 @@ func jalankan() error {
 	}
 	if info.Size() == 0 {
 		_ = os.Remove(path)
-		return fmt.Errorf("berkas backup kosong: %s", path)
+		return fmt.Errorf("backup file is empty: %s", path)
 	}
 
-	dihapus, err := rapikan(dir, keep())
+	removed, err := prune(dir, keepCount())
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("backup tersimpan: %s (%.1f KB)\n", path, float64(info.Size())/1024)
-	if dihapus > 0 {
-		fmt.Printf("backup lama dihapus: %d (sisakan %d terbaru)\n", dihapus, keep())
+	fmt.Printf("backup saved: %s (%.1f KB)\n", path, float64(info.Size())/1024)
+	if removed > 0 {
+		fmt.Printf("old backups removed: %d (kept %d newest)\n", removed, keepCount())
 	}
 	return nil
 }
 
-func keep() int {
+func keepCount() int {
 	value, err := strconv.Atoi(env("BACKUP_KEEP", "14"))
 	if err != nil || value < 1 {
 		return 14
@@ -104,33 +99,33 @@ func keep() int {
 	return value
 }
 
-// rapikan menyisakan sejumlah berkas terbaru dan menghapus sisanya.
-func rapikan(dir string, simpan int) (int, error) {
-	berkas, err := filepath.Glob(filepath.Join(dir, "anabul-*.sql.gz"))
+// prune keeps the newest keepCount files and removes the rest.
+func prune(dir string, keepCount int) (int, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "anabul-*.sql.gz"))
 	if err != nil {
 		return 0, err
 	}
-	if len(berkas) <= simpan {
+	if len(files) <= keepCount {
 		return 0, nil
 	}
 
-	sort.Slice(berkas, func(i, j int) bool {
-		infoI, errI := os.Stat(berkas[i])
-		infoJ, errJ := os.Stat(berkas[j])
+	sort.Slice(files, func(i, j int) bool {
+		infoI, errI := os.Stat(files[i])
+		infoJ, errJ := os.Stat(files[j])
 		if errI != nil || errJ != nil {
-			return berkas[i] > berkas[j]
+			return files[i] > files[j]
 		}
 		return infoI.ModTime().After(infoJ.ModTime())
 	})
 
-	dihapus := 0
-	for _, path := range berkas[simpan:] {
+	removed := 0
+	for _, path := range files[keepCount:] {
 		if err := os.Remove(path); err != nil {
-			return dihapus, fmt.Errorf("hapus %s: %w", path, err)
+			return removed, fmt.Errorf("remove %s: %w", path, err)
 		}
-		dihapus++
+		removed++
 	}
-	return dihapus, nil
+	return removed, nil
 }
 
 func env(key, fallback string) string {

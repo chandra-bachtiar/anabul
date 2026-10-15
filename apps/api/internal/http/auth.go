@@ -21,20 +21,19 @@ const (
 	sessionRefresh = 7 * 24 * time.Hour
 )
 
-var errUnauthorized = errors.New("sesi tidak valid")
+var errUnauthorized = errors.New("invalid session")
 
-// sessionManager menandatangani cookie sesi dengan HMAC-SHA256. Secret lama
-// tetap diterima untuk verifikasi supaya rotasi SESSION_SECRET tidak langsung
-// memaksa semua orang login ulang.
+// sessionManager signs the session cookie with HMAC-SHA256. The previous secret
+// stays valid for verification, so rotating SESSION_SECRET does not log everyone out.
 type sessionManager struct {
-	secret     []byte
-	sebelumnya []byte
+	secret   []byte
+	previous []byte
 }
 
-func newSessionManager(secret, sebelumnya string) *sessionManager {
+func newSessionManager(secret, previous string) *sessionManager {
 	return &sessionManager{
-		secret:     []byte(secret),
-		sebelumnya: []byte(strings.TrimSpace(sebelumnya)),
+		secret:   []byte(secret),
+		previous: []byte(strings.TrimSpace(previous)),
 	}
 }
 
@@ -59,11 +58,11 @@ func (m *sessionManager) verify(value string, now time.Time) (time.Time, error) 
 		return time.Time{}, errUnauthorized
 	}
 
-	cocok := hmac.Equal([]byte(signature), []byte(m.sign(payload)))
-	if !cocok && len(m.sebelumnya) > 0 {
-		cocok = hmac.Equal([]byte(signature), []byte(signWith(m.sebelumnya, payload)))
+	match := hmac.Equal([]byte(signature), []byte(m.sign(payload)))
+	if !match && len(m.previous) > 0 {
+		match = hmac.Equal([]byte(signature), []byte(signWith(m.previous, payload)))
 	}
-	if !cocok {
+	if !match {
 		return time.Time{}, errUnauthorized
 	}
 
@@ -91,21 +90,20 @@ func (s *Server) authenticated(r *http.Request) bool {
 	return err == nil
 }
 
-// authConfigured menandai password sudah diatur (di database atau environment).
+// authConfigured reports whether a password exists in the database or environment.
 func (s *Server) authConfigured(ctx context.Context) bool {
 	if s.cfg.SessionSecret == "" || s.auth == nil {
 		return false
 	}
 	configured, err := s.auth.Configured(ctx)
 	if err != nil {
-		slog.Error("gagal memeriksa konfigurasi password", "error", err)
+		slog.Error("failed to check the password configuration", "error", err)
 		return false
 	}
 	return configured
 }
 
-// setSessionCookie mengirim cookie sesi baru. Atribut Secure dimatikan saat
-// diakses lewat HTTP lokal supaya tetap bisa dipakai saat development.
+// setSessionCookie drops Secure on plain local HTTP so development keeps working.
 func (s *Server) setSessionCookie(w http.ResponseWriter, r *http.Request, now time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
@@ -130,7 +128,7 @@ func (s *Server) clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// rateLimiter membatasi percobaan login per alamat IP.
+// rateLimiter caps login attempts per address.
 type rateLimiter struct {
 	mu       sync.Mutex
 	attempts map[string][]time.Time
@@ -167,7 +165,7 @@ func (l *rateLimiter) forget(key string) {
 	delete(l.attempts, key)
 }
 
-// remoteHost mengambil alamat klien tanpa port.
+// remoteHost strips the port from the client address.
 func remoteHost(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

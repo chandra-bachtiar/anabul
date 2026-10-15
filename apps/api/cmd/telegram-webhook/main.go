@@ -1,11 +1,5 @@
-// cmd/telegram-webhook mendaftarkan webhook Telegram ke domain publik ANABUL
-// dan menampilkan statusnya. Butuh TELEGRAM_TOKEN, TELEGRAM_WEBHOOK_SECRET,
-// dan PUBLIC_URL (mis. https://anabul.contoh.com) di environment atau .env.
-//
-// Contoh:
-//
-//	go run ./cmd/telegram-webhook set
-//	go run ./cmd/telegram-webhook info
+// cmd/telegram-webhook registers the Telegram webhook for the public ANABUL
+// domain and prints its status; takes set or info, needs TELEGRAM_TOKEN, TELEGRAM_WEBHOOK_SECRET, PUBLIC_URL.
 package main
 
 import (
@@ -20,20 +14,20 @@ import (
 )
 
 func main() {
-	if err := jalankan(); err != nil {
-		fmt.Fprintln(os.Stderr, "gagal:", err)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "failed:", err)
 		os.Exit(1)
 	}
 }
 
-func jalankan() error {
-	perintah := "set"
+func run() error {
+	command := "set"
 	if len(os.Args) > 1 {
-		perintah = strings.TrimSpace(os.Args[1])
+		command = strings.TrimSpace(os.Args[1])
 	}
 
 	if err := config.LoadDotEnv(); err != nil {
-		return fmt.Errorf("baca .env: %w", err)
+		return fmt.Errorf("read .env: %w", err)
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -46,22 +40,22 @@ func jalankan() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	switch perintah {
+	switch command {
 	case "set":
 		public := strings.TrimSpace(os.Getenv("PUBLIC_URL"))
 		if public == "" {
-			return fmt.Errorf("PUBLIC_URL belum diisi, contoh: PUBLIC_URL=https://anabul.contoh.com")
+			return fmt.Errorf("PUBLIC_URL is not set, e.g. PUBLIC_URL=https://anabul.example.com")
 		}
 		webhookURL := strings.TrimRight(public, "/") + "/telegram/webhook"
 
 		if err := client.SetWebhook(ctx, webhookURL, cfg.TelegramWebhookSecret); err != nil {
 			return err
 		}
-		fmt.Printf("webhook terdaftar: %s\n", webhookURL)
+		fmt.Printf("webhook registered: %s\n", webhookURL)
 
 		info, err := client.Info(ctx)
 		if err == nil {
-			cetakInfo(info)
+			printInfo(info)
 		}
 		return nil
 
@@ -70,24 +64,24 @@ func jalankan() error {
 		if err != nil {
 			return err
 		}
-		cetakInfo(info)
+		printInfo(info)
 		return nil
 
 	default:
-		return fmt.Errorf("perintah %q tidak dikenal, pakai \"set\" atau \"info\"", perintah)
+		return fmt.Errorf("unknown command %q, use \"set\" or \"info\"", command)
 	}
 }
 
-func cetakInfo(info telegram.WebhookInfo) {
-	fmt.Println("status webhook:")
+func printInfo(info telegram.WebhookInfo) {
+	fmt.Println("webhook status:")
 	if info.URL == "" {
-		fmt.Println("  url: (belum ada)")
+		fmt.Println("  url: (not set)")
 	} else {
 		fmt.Printf("  url: %s\n", info.URL)
 	}
-	fmt.Printf("  update menunggu diproses: %d\n", info.PendingUpdateCount)
+	fmt.Printf("  pending updates: %d\n", info.PendingUpdateCount)
 	if info.LastErrorMessage != "" {
-		fmt.Printf("  error terakhir: %s\n", info.LastErrorMessage)
-		fmt.Println("  kalau error menyebut 401/403, cek TELEGRAM_WEBHOOK_SECRET di server dan di sini harus sama.")
+		fmt.Printf("  last error: %s\n", info.LastErrorMessage)
+		fmt.Println("  if the error mentions 401/403, TELEGRAM_WEBHOOK_SECRET must match on the server and here.")
 	}
 }

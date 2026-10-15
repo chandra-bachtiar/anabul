@@ -23,8 +23,8 @@ type telegramUpdate struct {
 	} `json:"message"`
 }
 
-// handleTelegramWebhook menerima pesan bot Telegram. Endpoint ini tanpa cookie
-// sesi, jadi diverifikasi lewat secret token header dan chat id pemilik.
+// handleTelegramWebhook takes bot messages. It carries no session cookie, so it
+// is verified with the secret token header and the owner chat id.
 func (s *Server) handleTelegramWebhook(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.TelegramToken == "" || s.cfg.TelegramWebhookSecret == "" {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "bot Telegram belum dikonfigurasi"})
@@ -60,12 +60,12 @@ func (s *Server) handleTelegramWebhook(w http.ResponseWriter, r *http.Request) {
 
 	reply, err := s.chat.Chat(ctx, "telegram", update.Message.Text)
 	if err != nil {
-		slog.Error("gagal memproses pesan telegram", "error", err)
+		slog.Error("failed to process the telegram message", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "gagal memproses pesan"})
 		return
 	}
 	if err := s.sendTelegram(ctx, chatID, reply.Reply); err != nil {
-		slog.Error("gagal mengirim balasan telegram", "error", err)
+		slog.Error("failed to send the telegram reply", "error", err)
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "gagal mengirim balasan"})
 		return
 	}
@@ -98,7 +98,7 @@ func (s *Server) sendTelegram(ctx context.Context, chatID, text string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("telegram membalas %d", resp.StatusCode)
+		return fmt.Errorf("telegram answered %d", resp.StatusCode)
 	}
 	return nil
 }

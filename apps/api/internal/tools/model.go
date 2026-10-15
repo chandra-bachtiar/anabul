@@ -2,8 +2,8 @@ package tools
 
 import "time"
 
-// Transaction adalah transaksi yang sudah siap ditampilkan (nama kategori dan
-// akun ikut dibawa supaya UI tidak perlu join sendiri).
+// Transaction already carries the category and account names so the UI does not
+// have to join anything.
 type Transaction struct {
 	ID           int64     `json:"id"`
 	Type         string    `json:"type"`
@@ -29,7 +29,6 @@ type Account struct {
 	Name string `json:"name"`
 }
 
-// BudgetRow adalah budget satu kategori beserta pemakaiannya.
 type BudgetRow struct {
 	CategoryID   int64  `json:"category_id"`
 	CategoryName string `json:"category_name"`
@@ -40,7 +39,6 @@ type BudgetRow struct {
 	Progress     int    `json:"progress"`
 }
 
-// NeedRow adalah kebutuhan bulanan pada satu bulan.
 type NeedRow struct {
 	ID            int64  `json:"id"`
 	Name          string `json:"name"`
@@ -54,7 +52,7 @@ type NeedRow struct {
 	DueSoon       bool   `json:"due_soon"`
 }
 
-// RecurringNeedRow adalah template kebutuhan bulanan.
+// RecurringNeedRow is a monthly need template.
 type RecurringNeedRow struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
@@ -72,7 +70,7 @@ type DebtPaymentRow struct {
 	Direction string    `json:"-"`
 }
 
-// DebtRow adalah hutang/piutang beserta sisa dan riwayat pembayaran.
+// DebtRow is a debt or receivable with its remaining amount and payment history.
 type DebtRow struct {
 	ID            int64            `json:"id"`
 	Person        string           `json:"person"`
@@ -90,12 +88,13 @@ type DebtRow struct {
 	Payments      []DebtPaymentRow `json:"payments,omitempty"`
 }
 
+// DebtTotals keeps the product's own wording for the two directions, since the
+// UI labels come straight from these values.
 type DebtTotals struct {
 	Hutang  int64 `json:"hutang"`
 	Piutang int64 `json:"piutang"`
 }
 
-// CategorySpend adalah pengeluaran per kategori pada satu bulan.
 type CategorySpend struct {
 	CategoryID   *int64 `json:"category_id"`
 	CategoryName string `json:"category_name"`
@@ -106,7 +105,6 @@ type CategorySpend struct {
 	Progress     int    `json:"progress"`
 }
 
-// Summary adalah ringkasan bulan yang dipakai agent dan halaman tutup bulan.
 type Summary struct {
 	Month        string          `json:"month"`
 	MonthLabel   string          `json:"month_label"`
@@ -130,7 +128,6 @@ type Summary struct {
 	transactionCount int64
 }
 
-// Dashboard adalah data untuk halaman Home.
 type Dashboard struct {
 	Month            string          `json:"month"`
 	MonthLabel       string          `json:"month_label"`
@@ -153,7 +150,6 @@ type Dashboard struct {
 	TransactionCount int64           `json:"transaction_count"`
 }
 
-// MonthPreview adalah ringkasan sebelum bulan ditutup.
 type MonthPreview struct {
 	Summary
 	UnpaidNeedRows []NeedRow   `json:"unpaid_need_rows"`
@@ -164,7 +160,7 @@ type MonthPreview struct {
 	BudgetOver     []BudgetRow `json:"budget_over"`
 }
 
-// Snapshot adalah isi month_closings.snapshot.
+// Snapshot is what lands in month_closings.snapshot.
 type Snapshot struct {
 	Month            string          `json:"month"`
 	MonthLabel       string          `json:"month_label"`

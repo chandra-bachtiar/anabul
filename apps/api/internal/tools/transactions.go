@@ -12,7 +12,6 @@ import (
 	"anabul/internal/store"
 )
 
-// AddTransactionInput adalah parameter lengkap untuk mencatat transaksi.
 type AddTransactionInput struct {
 	Type       string
 	Amount     int64
@@ -25,8 +24,7 @@ type AddTransactionInput struct {
 	Source     string
 }
 
-// UpdateTransactionInput memakai pointer supaya field yang tidak dikirim tidak
-// ikut berubah.
+// Nil fields are left alone, so a partial update never clears a column by accident.
 type UpdateTransactionInput struct {
 	ID            int64
 	Type          *string
@@ -39,7 +37,6 @@ type UpdateTransactionInput struct {
 	OccurredAt    *time.Time
 }
 
-// TransactionFilter adalah filter daftar transaksi.
 type TransactionFilter struct {
 	Month      string
 	CategoryID *int64
@@ -48,7 +45,6 @@ type TransactionFilter struct {
 	Limit      int32
 }
 
-// AddTransaction mencatat pemasukan/pengeluaran baru.
 func (s *Service) AddTransaction(ctx context.Context, in AddTransactionInput) (Transaction, error) {
 	return s.createTransaction(ctx, s.q, in)
 }
@@ -104,7 +100,6 @@ func (s *Service) createTransaction(ctx context.Context, q *store.Queries, in Ad
 	return s.transactionFromStore(row, category, account), nil
 }
 
-// UpdateTransaction mengubah transaksi yang sudah ada.
 func (s *Service) UpdateTransaction(ctx context.Context, in UpdateTransactionInput) (Transaction, error) {
 	current, err := s.q.GetTransaction(ctx, in.ID)
 	if err != nil {
@@ -175,7 +170,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, in UpdateTransactionInp
 	return s.transactionFromGetRow(updated), nil
 }
 
-// DeleteTransaction menghapus transaksi (soft delete).
+// DeleteTransaction only flags the row, so the agent can still undo it.
 func (s *Service) DeleteTransaction(ctx context.Context, id int64) error {
 	current, err := s.q.GetTransaction(ctx, id)
 	if err != nil {
@@ -190,7 +185,7 @@ func (s *Service) DeleteTransaction(ctx context.Context, id int64) error {
 	return s.q.SoftDeleteTransaction(ctx, id)
 }
 
-// LastTransaction mengambil transaksi terakhir (untuk "yang tadi salah").
+// LastTransaction backs the "the last one was wrong" path.
 func (s *Service) LastTransaction(ctx context.Context) (Transaction, error) {
 	row, err := s.q.LastTransaction(ctx)
 	if err != nil {
@@ -202,7 +197,6 @@ func (s *Service) LastTransaction(ctx context.Context) (Transaction, error) {
 	return s.transactionFromLastRow(row), nil
 }
 
-// ListTransactions mengembalikan transaksi satu bulan dengan filter opsional.
 func (s *Service) ListTransactions(ctx context.Context, filter TransactionFilter) ([]Transaction, error) {
 	month, err := s.ParseMonthArg(filter.Month)
 	if err != nil {
@@ -229,7 +223,6 @@ func (s *Service) ListTransactions(ctx context.Context, filter TransactionFilter
 	return result, nil
 }
 
-// LastTransactions mengambil beberapa transaksi terakhir pada satu bulan.
 func (s *Service) LastTransactions(ctx context.Context, month time.Time, limit int32) ([]Transaction, error) {
 	rows, err := s.q.ListTransactions(ctx, store.ListTransactionsParams{
 		MonthStart: dateOf(month),

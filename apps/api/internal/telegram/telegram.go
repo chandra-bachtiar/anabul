@@ -1,5 +1,5 @@
-// Package telegram membungkus pemanggilan Bot API yang dibutuhkan ANABUL:
-// mendaftarkan webhook dan membaca statusnya.
+// Package telegram wraps the Bot API calls ANABUL needs: registering the
+// webhook and reading its status.
 package telegram
 
 import (
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// DefaultBaseURL adalah alamat Bot API Telegram.
+// DefaultBaseURL is the Telegram Bot API address.
 const DefaultBaseURL = "https://api.telegram.org"
 
 type Client struct {
@@ -39,7 +39,7 @@ type apiResponse struct {
 	Result      json.RawMessage `json:"result"`
 }
 
-// WebhookInfo adalah isi getWebhookInfo.
+// WebhookInfo is the body of getWebhookInfo.
 type WebhookInfo struct {
 	URL                string `json:"url"`
 	HasCustomCert      bool   `json:"has_custom_certificate"`
@@ -48,16 +48,16 @@ type WebhookInfo struct {
 	LastErrorMessage   string `json:"last_error_message"`
 }
 
-// SetWebhook mendaftarkan URL webhook beserta secret token.
+// SetWebhook registers the webhook URL together with its secret token.
 func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
 	if c.token == "" {
-		return fmt.Errorf("TELEGRAM_TOKEN belum diisi")
+		return fmt.Errorf("TELEGRAM_TOKEN is not set")
 	}
 	if !strings.HasPrefix(url, "https://") {
-		return fmt.Errorf("URL webhook Telegram wajib HTTPS, dapat %q", url)
+		return fmt.Errorf("telegram webhook URL must be HTTPS, got %q", url)
 	}
 	if strings.TrimSpace(secret) == "" {
-		return fmt.Errorf("TELEGRAM_WEBHOOK_SECRET belum diisi")
+		return fmt.Errorf("TELEGRAM_WEBHOOK_SECRET is not set")
 	}
 
 	payload := map[string]any{
@@ -76,22 +76,22 @@ func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
 		return err
 	}
 	if !resp.OK {
-		return fmt.Errorf("telegram menolak setWebhook: %s", resp.Description)
+		return fmt.Errorf("telegram rejected setWebhook: %s", resp.Description)
 	}
 	return nil
 }
 
-// Info membaca status webhook yang terdaftar.
+// Info reads the registered webhook status.
 func (c *Client) Info(ctx context.Context) (WebhookInfo, error) {
 	if c.token == "" {
-		return WebhookInfo{}, fmt.Errorf("TELEGRAM_TOKEN belum diisi")
+		return WebhookInfo{}, fmt.Errorf("TELEGRAM_TOKEN is not set")
 	}
 	resp, err := c.call(ctx, "getWebhookInfo", []byte("{}"))
 	if err != nil {
 		return WebhookInfo{}, err
 	}
 	if !resp.OK {
-		return WebhookInfo{}, fmt.Errorf("telegram menolak getWebhookInfo: %s", resp.Description)
+		return WebhookInfo{}, fmt.Errorf("telegram rejected getWebhookInfo: %s", resp.Description)
 	}
 	var info WebhookInfo
 	if err := json.Unmarshal(resp.Result, &info); err != nil {
@@ -110,7 +110,7 @@ func (c *Client) call(ctx context.Context, method string, body []byte) (apiRespo
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return apiResponse{}, fmt.Errorf("panggil telegram: %w", err)
+		return apiResponse{}, fmt.Errorf("call telegram: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -121,10 +121,10 @@ func (c *Client) call(ctx context.Context, method string, body []byte) (apiRespo
 
 	var parsed apiResponse
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return apiResponse{}, fmt.Errorf("respons telegram tidak terbaca (HTTP %d)", resp.StatusCode)
+		return apiResponse{}, fmt.Errorf("unreadable telegram response (HTTP %d)", resp.StatusCode)
 	}
 	if resp.StatusCode != http.StatusOK && parsed.Description == "" {
-		return apiResponse{}, fmt.Errorf("telegram membalas HTTP %d", resp.StatusCode)
+		return apiResponse{}, fmt.Errorf("telegram returned HTTP %d", resp.StatusCode)
 	}
 	return parsed, nil
 }

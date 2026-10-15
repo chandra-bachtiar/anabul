@@ -1,6 +1,6 @@
-// Package auth menyimpan dan memeriksa password aplikasi. Password awal
-// diambil dari environment, lalu salinannya disimpan di tabel app_settings
-// supaya bisa diganti dari dalam aplikasi.
+// Package auth stores and checks the app password. The first hash comes from
+// the environment and is copied into app_settings, so the password can later be
+// changed from inside the app.
 package auth
 
 import (
@@ -16,11 +16,10 @@ import (
 	"anabul/internal/tools"
 )
 
-// DefaultPassword adalah password contoh yang dipakai saat pengembangan dan
-// ikut ditulis di README. Selama masih dipakai, aplikasi menyarankan ganti.
+// DefaultPassword is the sample password used during development and quoted in
+// the README. While it is still active the app keeps suggesting a change.
 const DefaultPassword = "anabul123"
 
-// MinPasswordLength adalah panjang minimal password baru.
 const MinPasswordLength = 8
 
 const settingKey = "password_hash"
@@ -31,15 +30,14 @@ type Manager struct {
 
 	mu     sync.RWMutex
 	cached string
-	aktif  bool
 }
 
 func New(q *store.Queries, envHash string) *Manager {
 	return &Manager{q: q, envHash: strings.TrimSpace(envHash)}
 }
 
-// EnsureSeeded menyalin hash dari environment ke database kalau belum ada.
-// Mengembalikan true kalau baris baru dibuat.
+// EnsureSeeded copies the environment hash into the database when it is missing.
+// It reports whether a new row was written.
 func (m *Manager) EnsureSeeded(ctx context.Context) (bool, error) {
 	if m.envHash == "" {
 		return false, nil
@@ -52,11 +50,11 @@ func (m *Manager) EnsureSeeded(ctx context.Context) (bool, error) {
 	if err := m.q.UpsertSetting(ctx, store.UpsertSettingParams{Key: settingKey, Value: m.envHash}); err != nil {
 		return false, err
 	}
-	m.simpan(m.envHash)
+	m.store(m.envHash)
 	return true, nil
 }
 
-// hash mengembalikan hash aktif: database dulu, lalu environment.
+// hash returns the active hash: the database first, then the environment.
 func (m *Manager) hash(ctx context.Context) (string, error) {
 	m.mu.RLock()
 	cached := m.cached
@@ -68,31 +66,29 @@ func (m *Manager) hash(ctx context.Context) (string, error) {
 	value, err := m.q.GetSetting(ctx, settingKey)
 	switch {
 	case err == nil && strings.TrimSpace(value) != "":
-		m.simpan(value)
+		m.store(value)
 		return value, nil
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return "", err
 	}
 
-	// Belum ada di database: pakai nilai dari environment.
+	// Not in the database yet: fall back to the environment value.
 	if m.envHash == "" {
 		return "", nil
 	}
 	if err := m.q.UpsertSetting(ctx, store.UpsertSettingParams{Key: settingKey, Value: m.envHash}); err != nil {
 		return "", err
 	}
-	m.simpan(m.envHash)
+	m.store(m.envHash)
 	return m.envHash, nil
 }
 
-func (m *Manager) simpan(hash string) {
+func (m *Manager) store(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cached = hash
-	m.aktif = bcrypt.CompareHashAndPassword([]byte(hash), []byte(DefaultPassword)) == nil
 }
 
-// Configured menandai apakah password sudah diatur.
 func (m *Manager) Configured(ctx context.Context) (bool, error) {
 	hash, err := m.hash(ctx)
 	if err != nil {
@@ -101,7 +97,6 @@ func (m *Manager) Configured(ctx context.Context) (bool, error) {
 	return hash != "", nil
 }
 
-// Verify mencocokkan password dengan hash aktif.
 func (m *Manager) Verify(ctx context.Context, password string) (bool, error) {
 	hash, err := m.hash(ctx)
 	if err != nil {
@@ -113,7 +108,7 @@ func (m *Manager) Verify(ctx context.Context, password string) (bool, error) {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil, nil
 }
 
-// UsingDefault menandai password yang masih sama dengan DefaultPassword.
+// UsingDefault reports whether the active password is still DefaultPassword.
 func (m *Manager) UsingDefault(ctx context.Context) (bool, error) {
 	hash, err := m.hash(ctx)
 	if err != nil {
@@ -125,7 +120,7 @@ func (m *Manager) UsingDefault(ctx context.Context) (bool, error) {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(DefaultPassword)) == nil, nil
 }
 
-// Set mengganti password setelah password lama diperiksa.
+// Set changes the password after checking the current one.
 func (m *Manager) Set(ctx context.Context, current, next string) error {
 	ok, err := m.Verify(ctx, current)
 	if err != nil {
@@ -145,11 +140,10 @@ func (m *Manager) Set(ctx context.Context, current, next string) error {
 	if err := m.q.UpsertSetting(ctx, store.UpsertSettingParams{Key: settingKey, Value: string(hash)}); err != nil {
 		return err
 	}
-	m.simpan(string(hash))
+	m.store(string(hash))
 	return nil
 }
 
-// ValidateNewPassword memeriksa aturan password baru.
 func ValidateNewPassword(current, next string) error {
 	next = strings.TrimSpace(next)
 	switch {

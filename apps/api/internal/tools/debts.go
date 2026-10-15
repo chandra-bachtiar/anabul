@@ -12,7 +12,6 @@ import (
 	"anabul/internal/store"
 )
 
-// AddDebtInput adalah parameter pencatatan hutang/piutang baru.
 type AddDebtInput struct {
 	Person    string
 	Direction string
@@ -21,20 +20,18 @@ type AddDebtInput struct {
 	DueDate   *time.Time
 }
 
-// AddDebtPaymentInput adalah parameter pembayaran hutang/piutang.
 type AddDebtPaymentInput struct {
 	Person        string
 	DebtID        *int64
 	Amount        int64
 	PaidAt        *time.Time
 	TransactionID *int64
-	// CatatTransaksi menentukan apakah pembayaran ikut dicatat sebagai
-	// pengeluaran (hutang) atau pemasukan (piutang) di catatan harian, supaya
-	// arus kas bulan itu ikut terhitung.
-	CatatTransaksi bool
+	// Books the payment as a real expense (hutang) or income (piutang) as well,
+	// so the month's cash flow stays honest.
+	RecordTransaction bool
 }
 
-// AddDebt mencatat hutang (user berhutang) atau piutang (orang berhutang ke user).
+// AddDebt: "hutang" is money the user owes, "piutang" is money owed to the user.
 func (s *Service) AddDebt(ctx context.Context, in AddDebtInput) (DebtRow, error) {
 	person := strings.TrimSpace(in.Person)
 	if person == "" {
@@ -61,7 +58,7 @@ func (s *Service) AddDebt(ctx context.Context, in AddDebtInput) (DebtRow, error)
 	return s.debtRow(row.ID, person, direction, row.AmountTotal, row.Note, row.DueDate, row.Status, 0, s.Now()), nil
 }
 
-// AddDebtPayment mencatat pembayaran/cicilan dan menandai lunas bila sisa 0.
+// AddDebtPayment books a payment and settles the debt when nothing is left.
 func (s *Service) AddDebtPayment(ctx context.Context, in AddDebtPaymentInput) (DebtRow, error) {
 	if in.Amount <= 0 {
 		return DebtRow{}, invalid("nominal pembayaran harus lebih dari 0")
@@ -89,9 +86,8 @@ func (s *Service) AddDebtPayment(ctx context.Context, in AddDebtPaymentInput) (D
 	err = s.InTx(ctx, func(q *store.Queries) error {
 		transactionID := in.TransactionID
 
-		// Pembayaran hutang mengeluarkan uang, pembayaran piutang menerima uang.
-		// Keduanya dicatat sebagai transaksi supaya total bulan ini sesuai.
-		if in.CatatTransaksi && transactionID == nil {
+		// Paying a debt moves money out, collecting a receivable moves it in.
+		if in.RecordTransaction && transactionID == nil {
 			txType := "expense"
 			note := "Bayar hutang ke " + debt.Person
 			if debt.Direction == "piutang" {
@@ -136,7 +132,6 @@ func (s *Service) AddDebtPayment(ctx context.Context, in AddDebtPaymentInput) (D
 	return s.debtRowFromDetail(detail, nil), nil
 }
 
-// ListDebts mengembalikan hutang piutang beserta sisa dan statusnya.
 func (s *Service) ListDebts(ctx context.Context, status, person string) ([]DebtRow, error) {
 	if status != "" && status != "open" && status != "settled" {
 		return nil, invalid("status harus 'open' atau 'settled'")
@@ -170,7 +165,6 @@ func (s *Service) ListDebts(ctx context.Context, status, person string) ([]DebtR
 	return result, nil
 }
 
-// GetDebt mengambil satu hutang lengkap dengan riwayat pembayarannya.
 func (s *Service) GetDebt(ctx context.Context, id int64) (DebtRow, error) {
 	detail, err := s.q.GetDebt(ctx, id)
 	if err != nil {
@@ -190,13 +184,12 @@ func (s *Service) GetDebt(ctx context.Context, id int64) (DebtRow, error) {
 	return s.debtRowFromDetail(detail, history), nil
 }
 
-// DebtTotals adalah total sisa hutang dan piutang yang masih berjalan.
 func (s *Service) DebtTotals(ctx context.Context) (DebtTotals, error) {
 	row, err := s.q.DebtTotals(ctx)
 	if err != nil {
 		return DebtTotals{}, err
 	}
-	return DebtTotals{Hutang: row.Hutang, Piutang: row.Piutang}, nil
+	return DebtTotals{Hutang: row.DebtTotal, Piutang: row.ReceivableTotal}, nil
 }
 
 type debtRecord struct {

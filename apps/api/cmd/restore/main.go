@@ -1,12 +1,5 @@
-// cmd/restore mengembalikan dump dari cmd/backup ke database tujuan.
-//
-// Contoh:
-//
-//	go run ./cmd/restore backups/anabul-20261014-070000.sql.gz
-//	DATABASE_URL=postgres://... go run ./cmd/restore backup.sql.gz
-//
-// Awas: restore menimpa isi tabel yang ada, jadi pastikan DATABASE_URL menunjuk
-// ke database yang benar (mis. database baru) sebelum menjalankannya.
+// cmd/restore loads a dump produced by cmd/backup into the database named by
+// DATABASE_URL, overwriting existing rows; usage: go run ./cmd/restore <backup.sql.gz>.
 package main
 
 import (
@@ -23,20 +16,20 @@ import (
 )
 
 func main() {
-	if err := jalankan(); err != nil {
-		fmt.Fprintln(os.Stderr, "restore gagal:", err)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "restore failed:", err)
 		os.Exit(1)
 	}
 }
 
-func jalankan() error {
+func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("pakai: go run ./cmd/restore <berkas-backup.sql.gz>")
+		return fmt.Errorf("usage: go run ./cmd/restore <backup-file.sql.gz>")
 	}
 	path := strings.TrimSpace(os.Args[1])
 
 	if err := config.LoadDotEnv(); err != nil {
-		return fmt.Errorf("baca .env: %w", err)
+		return fmt.Errorf("read .env: %w", err)
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -45,7 +38,7 @@ func jalankan() error {
 
 	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("buka berkas backup: %w", err)
+		return fmt.Errorf("open backup file: %w", err)
 	}
 	defer file.Close()
 
@@ -53,7 +46,7 @@ func jalankan() error {
 	if strings.HasSuffix(path, ".gz") {
 		gz, err := gzip.NewReader(file)
 		if err != nil {
-			return fmt.Errorf("baca gzip: %w", err)
+			return fmt.Errorf("read gzip: %w", err)
 		}
 		defer gz.Close()
 		src = gz
@@ -62,13 +55,13 @@ func jalankan() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	if err := pgdump.Tersedia(ctx); err != nil {
+	if err := pgdump.Available(ctx); err != nil {
 		return err
 	}
 	if err := pgdump.Restore(ctx, cfg.DatabaseURL, src); err != nil {
 		return err
 	}
 
-	fmt.Printf("restore selesai dari %s\n", path)
+	fmt.Printf("restore complete from %s\n", path)
 	return nil
 }

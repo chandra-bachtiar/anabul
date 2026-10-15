@@ -8,12 +8,12 @@ import (
 )
 
 var (
-	// scriptPattern memisahkan atribut tag dan isi setiap skrip.
+	// scriptPattern splits each script tag's attributes from its body.
 	scriptPattern = regexp.MustCompile(`(?is)<script([^>]*)>(.*?)</script>`)
 	srcAttribute  = regexp.MustCompile(`(?i)\bsrc\s*=`)
 )
 
-// Hashes menghitung hash CSP untuk skrip inline di index.html yang di-embed.
+// Hashes returns CSP hashes for the inline scripts in the embedded index.html.
 func Hashes() []string {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
@@ -26,21 +26,20 @@ func Hashes() []string {
 	return InlineScriptHashes(index)
 }
 
-// InlineScriptHashes menghitung hash SHA-256 (format CSP) untuk setiap skrip
-// inline. SvelteKit menyisipkan satu skrip inline saat hydration, jadi CSP tidak
-// cukup memakai 'self' dan tidak perlu turun ke 'unsafe-inline'.
+// InlineScriptHashes returns the SHA-256 hash (CSP format) of every inline
+// script. SvelteKit injects one at hydration, so 'self' is not enough.
 func InlineScriptHashes(index []byte) []string {
-	hasil := make([]string, 0, 1)
+	hashes := make([]string, 0, 1)
 	for _, match := range scriptPattern.FindAllSubmatch(index, -1) {
 		if srcAttribute.Match(match[1]) {
 			continue
 		}
-		isi := match[2]
-		if len(isi) == 0 {
+		body := match[2]
+		if len(body) == 0 {
 			continue
 		}
-		ringkas := sha256.Sum256(isi)
-		hasil = append(hasil, "'sha256-"+base64.StdEncoding.EncodeToString(ringkas[:])+"'")
+		digest := sha256.Sum256(body)
+		hashes = append(hashes, "'sha256-"+base64.StdEncoding.EncodeToString(digest[:])+"'")
 	}
-	return hasil
+	return hashes
 }

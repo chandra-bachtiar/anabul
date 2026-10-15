@@ -14,23 +14,23 @@ func TestInlineScriptHashes(t *testing.T) {
 
 	hashes := InlineScriptHashes(index)
 	if len(hashes) != 1 {
-		t.Fatalf("hash = %d, ingin 1 (hanya skrip inline)", len(hashes))
+		t.Fatalf("hashes = %d, want 1 (inline scripts only)", len(hashes))
 	}
 	if !strings.HasPrefix(hashes[0], "'sha256-") || !strings.HasSuffix(hashes[0], "'") {
-		t.Fatalf("format hash tidak sesuai CSP: %q", hashes[0])
+		t.Fatalf("hash does not match the CSP format: %q", hashes[0])
 	}
 
-	if lagi := InlineScriptHashes(index); lagi[0] != hashes[0] {
-		t.Fatal("hash harus stabil untuk isi yang sama")
+	if again := InlineScriptHashes(index); again[0] != hashes[0] {
+		t.Fatal("the hash must be stable for identical content")
 	}
-	if beda := InlineScriptHashes([]byte(`<script>window.x = 2</script>`)); beda[0] == hashes[0] {
-		t.Fatal("isi berbeda harus menghasilkan hash berbeda")
+	if different := InlineScriptHashes([]byte(`<script>window.x = 2</script>`)); different[0] == hashes[0] {
+		t.Fatal("different content must produce a different hash")
 	}
 }
 
-func TestInlineScriptHashesTidakAdaSkripInline(t *testing.T) {
+func TestInlineScriptHashesWithoutInlineScripts(t *testing.T) {
 	index := []byte(`<html><head><script src="/app.js"></script></head></html>`)
 	if hashes := InlineScriptHashes(index); len(hashes) != 0 {
-		t.Fatalf("hash = %d, ingin 0", len(hashes))
+		t.Fatalf("hashes = %d, want 0", len(hashes))
 	}
 }
