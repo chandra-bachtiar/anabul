@@ -44,10 +44,13 @@ Makefile
 
 13. **Brand**: nama app ANABUL, maskot kucing, gaya UI playful. Ikuti `docs/UI_SPEC.md` (palet, font, maskot, microcopy). Teks UI dan balasan agent berbahasa Indonesia santai; pesan error dan uang tetap jelas, tidak dibuat bercanda. Nama image Docker: `anabul`.
 
+14. **Bahasa kode vs bahasa tampilan.** Semua yang ada di dalam kode memakai bahasa Inggris: nama variabel, fungsi, tipe, komentar, pesan log, keluaran perintah CLI, komentar di Makefile/Docker/compose/Caddyfile, dan `.env.example`. Bahasa Indonesia hanya untuk yang dilihat pengguna: microcopy UI, balasan agent, dan pesan error yang muncul di aplikasi (termasuk body `{"error": ...}` dari REST API dan error domain di `internal/tools`). Contoh pesan di `apps/api/internal/agent/testdata/` tetap Indonesia karena itu contoh input pengguna.
+
 ## Konvensi kode
 - Go: `gofmt`, error di-wrap dengan konteks, `context.Context` di semua operasi I/O, tidak ada global state; test table-driven untuk tool dan perhitungan budget/tutup bulan.
 - Query SQL ditulis di `apps/api/internal/store/queries/*.sql`, kode digenerate `sqlc`.
 - Svelte: TypeScript, komponen kecil, state sederhana (stores/runes), tidak ada library state tambahan kecuali perlu.
+- Komentar ditulis seperti senior menulis catatan: hanya untuk alasan, batasan, kasus tepi, atau perilaku yang tidak terlihat dari kode. Maksimal dua baris, sentence case, tanpa banner, emoji, atau narasi langkah. Kalau kode sudah jelas, tidak ada komentar.
 - Commit kecil dan fokus, pesan commit imperatif.
 
 ## Definition of done

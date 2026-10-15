@@ -19,7 +19,7 @@ migrate:
 	cd $(API_DIR) && go run ./cmd/migrate
 
 sqlc:
-	# Pakai image resmi supaya tidak perlu memasang sqlc di mesin.
+	# Use the official image so sqlc does not have to be installed locally.
 	docker run --rm -v "$(CURDIR)/$(API_DIR):/src" -w /src sqlc/sqlc generate
 
 test:
@@ -31,8 +31,8 @@ build-web:
 	rm -rf $(DIST_DIR)
 	mkdir -p $(DIST_DIR)
 	cp -r $(WEB_DIR)/build/. $(DIST_DIR)/
-	# Penanda ini yang membuat folder dist tetap ada di git, karena `go:embed`
-	# butuh folder itu ada saat build tanpa frontend (mis. `go build ./...`).
+	# This marker keeps the dist folder in git: `go:embed` needs the folder to
+	# exist when building without the frontend (e.g. `go build ./...`).
 	touch $(DIST_DIR)/.gitkeep
 
 build: build-web
@@ -42,24 +42,24 @@ build: build-web
 docker:
 	docker build -t anabul .
 
-# Backup harian: menyimpan dump ke backups/ dan menyisakan BACKUP_KEEP berkas terbaru.
+# Daily backup: writes a dump into backups/ and keeps the newest BACKUP_KEEP files.
 backup:
 	cd $(API_DIR) && BACKUP_DIR="$(abspath backups)" go run ./cmd/backup
 
-# Kembalikan dump: make restore FILE=backups/anabul-20261014-070000.sql.gz
+# Restore a dump: make restore FILE=backups/anabul-20261014-070000.sql.gz
 restore:
-	@test -n "$(FILE)" || (echo "pakai: make restore FILE=backups/anabul-....sql.gz" && exit 1)
+	@test -n "$(FILE)" || (echo "usage: make restore FILE=backups/anabul-....sql.gz" && exit 1)
 	cd $(API_DIR) && go run ./cmd/restore "$(abspath $(FILE))"
 
-# Jalankan app + reverse proxy dengan HTTPS (butuh DOMAIN dan .env yang sudah diisi).
+# Run the app plus the reverse proxy with HTTPS (needs DOMAIN and a filled .env).
 prod-up:
 	docker compose -f docker-compose.prod.yml up -d --build
 
 prod-down:
 	docker compose -f docker-compose.prod.yml down
 
-# Daftarkan webhook Telegram ke URL publik (butuh TELEGRAM_TOKEN, TELEGRAM_WEBHOOK_SECRET,
-# TELEGRAM_OWNER_CHAT_ID, dan PUBLIC_URL di .env).
+# Register the Telegram webhook against the public URL (needs TELEGRAM_TOKEN,
+# TELEGRAM_WEBHOOK_SECRET, TELEGRAM_OWNER_CHAT_ID, and PUBLIC_URL in .env).
 webhook:
 	cd $(API_DIR) && go run ./cmd/telegram-webhook set
 

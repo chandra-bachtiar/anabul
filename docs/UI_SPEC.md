@@ -22,9 +22,9 @@
 | `icon-maskable.svg`, `icon-maskable-512.png` | ikon PWA (`purpose: maskable`, ada safe zone) |
 | `apple-touch-icon.png` | ikon iOS home screen |
 | `favicon.svg` | favicon |
-| `mascot-senang.svg` | maskot mood normal |
-| `mascot-khawatir.svg` | maskot mood budget menipis/lewat |
-| `mascot-tidur.svg` | maskot untuk empty state / bulan terkunci |
+| `mascot-happy.svg` | maskot mood normal |
+| `mascot-worried.svg` | maskot mood budget menipis/lewat |
+| `mascot-asleep.svg` | maskot untuk empty state / bulan terkunci |
 
 Ini versi awal buatan AI (SVG vektor, mudah diubah). Boleh diganti ilustrasi final nanti selama nama file dan fungsinya sama.
 

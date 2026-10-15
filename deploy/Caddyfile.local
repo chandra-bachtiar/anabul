@@ -1,6 +1,6 @@
-# Konfigurasi Caddy untuk uji lokal: sertifikat self-signed (tls internal),
-# jadi browser akan memperingatkan sertifikat. Buka https://localhost:8443.
-# Nama container ikut didaftarkan supaya bisa diuji juga dari container lain.
+# Caddy config for local testing: self-signed certificate (tls internal), so the
+# browser warns about the certificate. Open https://localhost:8443.
+# The container name is registered too, so it can be tested from another container.
 https://localhost:8443, https://anabul-caddy:8443 {
 	tls internal
 	encode zstd gzip

@@ -1,9 +1,9 @@
-# Konfigurasi Caddy untuk deployment publik: HTTPS otomatis dari Let's Encrypt.
-# Isi DOMAIN lewat environment (lihat docker-compose.prod.yml).
+# Caddy config for public deployment: automatic HTTPS via Let's Encrypt.
+# DOMAIN comes from the environment (see docker-compose.prod.yml).
 {$DOMAIN} {
 	encode zstd gzip
 
-	# HSTS aman ditambahkan di sini karena Caddy yang memegang TLS.
+	# HSTS is safe here because Caddy terminates TLS.
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
