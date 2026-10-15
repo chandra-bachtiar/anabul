@@ -1,8 +1,8 @@
 /**
- * Haptic ringan untuk umpan balik saat aksi berhasil. Dipakai kalau perangkat
- * mendukung getaran dan pengguna tidak mematikan animasi di pengaturan sistem.
+ * Vibrate only when the device supports it and the user has not asked for
+ * reduced motion.
  */
-function bolehGetar(): boolean {
+function canVibrate(): boolean {
 	if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
 		return false;
 	}
@@ -12,20 +12,17 @@ function bolehGetar(): boolean {
 	return true;
 }
 
-/** Getaran singkat, mis. saat catatan berhasil disimpan. */
-export function getarRingan(): void {
-	if (!bolehGetar()) return;
+export function hapticLight(): void {
+	if (!canVibrate()) return;
 	navigator.vibrate(12);
 }
 
-/** Getaran perayaan, mis. saat hutang lunas atau bulan ditutup. */
-export function getarSenang(): void {
-	if (!bolehGetar()) return;
+export function hapticCelebrate(): void {
+	if (!canVibrate()) return;
 	navigator.vibrate([16, 60, 24]);
 }
 
-/** Apakah animasi boleh jalan (menghormati pengaturan kurangi gerak). */
-export function bolehBergerak(): boolean {
+export function motionAllowed(): boolean {
 	if (typeof window === 'undefined') return false;
 	return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

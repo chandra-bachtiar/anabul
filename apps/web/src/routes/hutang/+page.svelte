@@ -6,118 +6,115 @@
 	import Progress from '#lib/components/Progress.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
-	import { formatRupiah, labelTanggal, labelTanggalPendek } from '#lib/format';
-	import { getarRingan, getarSenang } from '#lib/haptic';
+	import { formatRupiah, formatDate, formatDateShort } from '#lib/format';
+	import { hapticLight, hapticCelebrate } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { Debt, DebtTotals } from '#lib/types';
 
-	let arah = $state<'hutang' | 'piutang'>('hutang');
-	let daftar = $state<Debt[]>([]);
+	let direction = $state<'hutang' | 'piutang'>('hutang');
+	let debts = $state<Debt[]>([]);
 	let total = $state<DebtTotals>({ hutang: 0, piutang: 0 });
-	let memuat = $state(true);
-	let pesanError = $state('');
-	let tampilLunas = $state(false);
+	let loading = $state(true);
+	let errorMessage = $state('');
+	let showSettled = $state(false);
 
 	let detail = $state<Debt | null>(null);
-	let nominalBayar = $state(0);
-	let catatTransaksi = $state(true);
-	let memproses = $state(false);
-	let perayaan = $state(0);
+	let paymentAmount = $state(0);
+	let recordTransaction = $state(true);
+	let processing = $state(false);
+	let celebration = $state(0);
 
-	let tambahTerbuka = $state(false);
-	let formBaru = $state({ person: '', amount: 0, note: '', due_date: '' });
+	let addSheetOpen = $state(false);
+	let newForm = $state({ person: '', amount: 0, note: '', due_date: '' });
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
+	async function load() {
+		loading = true;
+		errorMessage = '';
 		try {
-			const hasil = await api.debts(tampilLunas ? undefined : 'open');
-			daftar = hasil.debts;
-			total = hasil.totals;
+			const result = await api.debts(showSettled ? undefined : 'open');
+			debts = result.debts;
+			total = result.totals;
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat hutang piutang.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat hutang piutang.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
-	onMount(() => void muat());
+	onMount(() => void load());
 
-	const terlihat = $derived(daftar.filter((item) => item.direction === arah));
+	const visibleItems = $derived(debts.filter((item) => item.direction === direction));
 
-	async function bukaDetail(id: number) {
+	async function openDetail(id: number) {
 		try {
 			detail = await api.debt(id);
-			nominalBayar = detail.remaining;
-			catatTransaksi = true;
+			paymentAmount = detail.remaining;
+			recordTransaction = true;
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal membuka rincian.', 'error');
 		}
 	}
 
-	async function bayar() {
+	async function pay() {
 		if (!detail) return;
-		const orang = detail.person;
-		const ikutDicatat = catatTransaksi;
-		const hutang = detail.direction === 'hutang';
-		memproses = true;
+		const person = detail.person;
+		const includeInJournal = recordTransaction;
+		const isDebt = detail.direction === 'hutang';
+		processing = true;
 		try {
-			const hasil = await api.createDebtPayment(detail.id, nominalBayar, ikutDicatat);
+			const result = await api.createDebtPayment(detail.id, paymentAmount, includeInJournal);
 
-			// Form ditutup setelah tersimpan; sisanya bisa dilihat lagi dari
-			// kartu (jumlah bayar dan tanggal terakhir) atau dengan membuka
-			// rinciannya kembali.
 			detail = null;
-			nominalBayar = 0;
+			paymentAmount = 0;
 
-			const catatan = ikutDicatat
-				? hutang
+			const journalNote = includeInJournal
+				? isDebt
 					? ' Masuk pengeluaran bulan ini.'
 					: ' Masuk pemasukan bulan ini.'
 				: ' Tidak masuk catatan harian.';
 
-			if (hasil.status === 'settled') {
-				perayaan += 1;
-				getarSenang();
-				toast(`${orang} sudah lunas. Meong!${catatan}`, 'ok', 6000);
+			if (result.status === 'settled') {
+				celebration += 1;
+				hapticCelebrate();
+				toast(`${person} sudah lunas. Meong!${journalNote}`, 'ok', 6000);
 			} else {
-				getarRingan();
-				toast(`Pembayaran ${orang} tercatat. Sisa ${formatRupiah(hasil.remaining)}.${catatan}`, 'ok', 5000);
+				hapticLight();
+				toast(`Pembayaran ${person} tercatat. Sisa ${formatRupiah(result.remaining)}.${journalNote}`, 'ok', 5000);
 			}
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal mencatat pembayaran.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function tambah() {
-		memproses = true;
+	async function createDebt() {
+		processing = true;
 		try {
 			await api.createDebt({
-				person: formBaru.person,
-				direction: arah,
-				amount: formBaru.amount,
-				note: formBaru.note,
-				due_date: formBaru.due_date || null
+				person: newForm.person,
+				direction,
+				amount: newForm.amount,
+				note: newForm.note,
+				due_date: newForm.due_date || null
 			});
-			tambahTerbuka = false;
-			formBaru = { person: '', amount: 0, note: '', due_date: '' };
-			getarRingan();
-			toast(arah === 'hutang' ? 'Hutang baru dicatat.' : 'Piutang baru dicatat.');
-			await muat();
+			addSheetOpen = false;
+			newForm = { person: '', amount: 0, note: '', due_date: '' };
+			hapticLight();
+			toast(direction === 'hutang' ? 'Hutang baru dicatat.' : 'Piutang baru dicatat.');
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan catatan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	function statusJatuhTempo(item: Debt): string {
+	function dueStatus(item: Debt): string {
 		if (item.status === 'settled') return 'Lunas';
 		if (!item.due_date) return 'Tanpa jatuh tempo';
-		return `${item.overdue ? 'Telat sejak' : 'Jatuh tempo'} ${labelTanggalPendek(item.due_date)}`;
+		return `${item.overdue ? 'Telat sejak' : 'Jatuh tempo'} ${formatDateShort(item.due_date)}`;
 	}
 </script>
 
@@ -128,7 +125,7 @@
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="font-display text-2xl font-semibold">Hutang piutang</h1>
-		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={() => (tambahTerbuka = true)}>
+		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={() => (addSheetOpen = true)}>
 			Catat baru
 		</button>
 	</header>
@@ -137,48 +134,48 @@
 		<button
 			type="button"
 			role="tab"
-			aria-selected={arah === 'hutang'}
-			class="btn min-h-11 {arah === 'hutang' ? 'btn-primary' : 'btn-outline'}"
-			onclick={() => (arah = 'hutang')}
+			aria-selected={direction === 'hutang'}
+			class="btn min-h-11 {direction === 'hutang' ? 'btn-primary' : 'btn-outline'}"
+			onclick={() => (direction = 'hutang')}
 		>
 			Hutangku {formatRupiah(total.hutang)}
 		</button>
 		<button
 			type="button"
 			role="tab"
-			aria-selected={arah === 'piutang'}
-			class="btn min-h-11 {arah === 'piutang' ? 'btn-primary' : 'btn-outline'}"
-			onclick={() => (arah = 'piutang')}
+			aria-selected={direction === 'piutang'}
+			class="btn min-h-11 {direction === 'piutang' ? 'btn-primary' : 'btn-outline'}"
+			onclick={() => (direction = 'piutang')}
 		>
 			Piutangku {formatRupiah(total.piutang)}
 		</button>
 	</div>
 
 	<label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-base-300 px-3">
-		<input type="checkbox" class="checkbox" bind:checked={tampilLunas} onchange={() => void muat()} />
+		<input type="checkbox" class="checkbox" bind:checked={showSettled} onchange={() => void load()} />
 		<span class="text-sm">Tampilkan yang sudah lunas</span>
 	</label>
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
-	{:else if terlihat.length === 0}
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
+	{:else if visibleItems.length === 0}
 		<StateBlock
 			state="empty"
-			title={arah === 'hutang' ? 'Tidak ada hutang berjalan' : 'Tidak ada piutang berjalan'}
+			title={direction === 'hutang' ? 'Tidak ada hutang berjalan' : 'Tidak ada piutang berjalan'}
 			message={'Kalau ada yang pinjam uang, catat di sini biar tidak lupa. Contoh obrolan: "gua minjem 200rb ke Budi".'}
 			actionLabel="Catat baru"
-			onaction={() => (tambahTerbuka = true)}
+			onaction={() => (addSheetOpen = true)}
 		/>
 	{:else}
-		<ul class="anim-daftar space-y-2">
-			{#each terlihat as item (item.id)}
-				<li class="card card-mengambang bg-base-200">
+		<ul class="anim-list space-y-2">
+			{#each visibleItems as item (item.id)}
+				<li class="card card-hover-lift bg-base-200">
 					<button
 						type="button"
 						class="w-full rounded-box text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-						onclick={() => void bukaDetail(item.id)}
+						onclick={() => void openDetail(item.id)}
 					>
 						<div class="card-body gap-2 p-4">
 							<div class="flex items-baseline justify-between gap-3">
@@ -199,13 +196,13 @@
 							/>
 
 							<p class="text-xs {item.overdue ? 'font-semibold text-error-ink' : 'opacity-70'}">
-								{statusJatuhTempo(item)}
+								{dueStatus(item)}
 							</p>
 
 							<p class="text-xs opacity-70">
 								{#if item.payment_count > 0}
 									{item.payment_count}x bayar
-									{#if item.last_payment_at}· terakhir {labelTanggalPendek(item.last_payment_at)}{/if}
+									{#if item.last_payment_at}· terakhir {formatDateShort(item.last_payment_at)}{/if}
 									· total {formatRupiah(item.paid)} dari {formatRupiah(item.amount_total)}
 								{:else}
 									Belum ada pembayaran · ketuk untuk lihat riwayat dan catat bayar
@@ -219,7 +216,7 @@
 	{/if}
 </div>
 
-<Confetti trigger={perayaan} />
+<Confetti trigger={celebration} />
 
 <Sheet
 	open={detail !== null}
@@ -245,7 +242,7 @@
 			{/if}
 
 			{#if detail.due_date}
-				<p class="text-sm opacity-80">Jatuh tempo {labelTanggal(detail.due_date)}</p>
+				<p class="text-sm opacity-80">Jatuh tempo {formatDate(detail.due_date)}</p>
 			{/if}
 
 			<div>
@@ -254,13 +251,13 @@
 					<span class="tabular-nums opacity-70">{detail.payment_count}x · {formatRupiah(detail.paid)}</span>
 				</h3>
 				{#if detail.payments && detail.payments.length > 0}
-					<ul class="anim-daftar space-y-1 text-sm">
-						{#each detail.payments as bayarItem, index (bayarItem.id)}
+					<ul class="anim-list space-y-1 text-sm">
+						{#each detail.payments as payment, index (payment.id)}
 							<li class="flex items-baseline justify-between gap-3 rounded-xl bg-base-300/40 px-3 py-2">
 								<span class="opacity-70">
-									{#if index === 0}Terakhir · {/if}{labelTanggal(bayarItem.paid_at)}
+									{#if index === 0}Terakhir · {/if}{formatDate(payment.paid_at)}
 								</span>
-								<span class="tabular-nums font-medium">{formatRupiah(bayarItem.amount)}</span>
+								<span class="tabular-nums font-medium">{formatRupiah(payment.amount)}</span>
 							</li>
 						{/each}
 					</ul>
@@ -276,16 +273,16 @@
 					class="space-y-3"
 					onsubmit={(event) => {
 						event.preventDefault();
-						void bayar();
+						void pay();
 					}}
 				>
 					<div>
-						<label class="label pb-1 text-sm font-semibold" for="nominal-bayar-hutang">Nominal pembayaran</label>
-						<MoneyInput id="nominal-bayar-hutang" value={nominalBayar} onchange={(value) => (nominalBayar = value)} />
+						<label class="label pb-1 text-sm font-semibold" for="debt-payment-amount">Nominal pembayaran</label>
+						<MoneyInput id="debt-payment-amount" value={paymentAmount} onchange={(value) => (paymentAmount = value)} />
 					</div>
 
 					<label class="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-base-300 px-3 py-2">
-						<input type="checkbox" class="checkbox mt-1" bind:checked={catatTransaksi} />
+						<input type="checkbox" class="checkbox mt-1" bind:checked={recordTransaction} />
 						<span class="text-sm">
 							Catat juga di buku harian
 							<span class="block text-xs opacity-70">
@@ -297,11 +294,11 @@
 					</label>
 
 					<div class="flex justify-end gap-2">
-						<button type="button" class="btn btn-ghost min-h-11" onclick={() => (nominalBayar = detail?.remaining ?? 0)}>
+						<button type="button" class="btn btn-ghost min-h-11" onclick={() => (paymentAmount = detail?.remaining ?? 0)}>
 							Isi sisa penuh
 						</button>
-						<button type="submit" class="btn btn-primary min-h-11" disabled={memproses || nominalBayar <= 0}>
-							{memproses ? 'Menyimpan...' : 'Catat pembayaran'}
+						<button type="submit" class="btn btn-primary min-h-11" disabled={processing || paymentAmount <= 0}>
+							{processing ? 'Menyimpan...' : 'Catat pembayaran'}
 						</button>
 					</div>
 				</form>
@@ -311,38 +308,38 @@
 </Sheet>
 
 <Sheet
-	open={tambahTerbuka}
-	title={arah === 'hutang' ? 'Catat hutang' : 'Catat piutang'}
-	description={arah === 'hutang' ? 'Kamu yang berhutang ke orang lain.' : 'Orang lain yang berhutang ke kamu.'}
-	onclose={() => (tambahTerbuka = false)}
+	open={addSheetOpen}
+	title={direction === 'hutang' ? 'Catat hutang' : 'Catat piutang'}
+	description={direction === 'hutang' ? 'Kamu yang berhutang ke orang lain.' : 'Orang lain yang berhutang ke kamu.'}
+	onclose={() => (addSheetOpen = false)}
 >
 	<form
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void tambah();
+			void createDebt();
 		}}
 	>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="nama-orang">Nama orang</label>
-			<input id="nama-orang" class="input input-bordered min-h-11 w-full" bind:value={formBaru.person} required />
+			<input id="nama-orang" class="input input-bordered min-h-11 w-full" bind:value={newForm.person} required />
 		</div>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="nominal-hutang">Nominal</label>
-			<MoneyInput id="nominal-hutang" value={formBaru.amount} onchange={(value) => (formBaru.amount = value)} required />
+			<MoneyInput id="nominal-hutang" value={newForm.amount} onchange={(value) => (newForm.amount = value)} required />
 		</div>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="catatan-hutang">Catatan</label>
-			<input id="catatan-hutang" class="input input-bordered min-h-11 w-full" bind:value={formBaru.note} />
+			<input id="catatan-hutang" class="input input-bordered min-h-11 w-full" bind:value={newForm.note} />
 		</div>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="jatuh-tempo">Jatuh tempo (opsional)</label>
-			<input id="jatuh-tempo" type="date" class="input input-bordered min-h-11 w-full" bind:value={formBaru.due_date} />
+			<input id="jatuh-tempo" type="date" class="input input-bordered min-h-11 w-full" bind:value={newForm.due_date} />
 		</div>
 		<div class="flex justify-end gap-2">
-			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (tambahTerbuka = false)}>Batal</button>
-			<button type="submit" class="btn btn-primary min-h-11" disabled={memproses || formBaru.amount <= 0 || !formBaru.person.trim()}>
-				{memproses ? 'Menyimpan...' : 'Simpan'}
+			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (addSheetOpen = false)}>Batal</button>
+			<button type="submit" class="btn btn-primary min-h-11" disabled={processing || newForm.amount <= 0 || !newForm.person.trim()}>
+				{processing ? 'Menyimpan...' : 'Simpan'}
 			</button>
 		</div>
 	</form>

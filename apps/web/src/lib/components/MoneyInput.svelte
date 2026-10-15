@@ -9,22 +9,22 @@
 
 	let { value, id, onchange, placeholder = '0', required = false }: Props = $props();
 
-	const angka = new Intl.NumberFormat('id-ID');
-	const tampil = $derived(value > 0 ? angka.format(value) : '');
+	const numberFormat = new Intl.NumberFormat('id-ID');
+	const display = $derived(value > 0 ? numberFormat.format(value) : '');
 </script>
 
-<!-- Nominal ditulis sebagai rupiah bulat, jadi pemisah ribuan langsung muncul
-     dan huruf lain diabaikan. -->
+<!-- Amounts never have cents, so typing shows the thousands separators and
+     every other character is dropped. -->
 <input
 	{id}
 	type="text"
 	inputmode="numeric"
 	{required}
-	value={tampil}
+	value={display}
 	{placeholder}
 	class="input input-bordered min-h-11 w-full text-right font-display text-xl tabular-nums"
 	oninput={(event) => {
-		const digit = event.currentTarget.value.replace(/\D/g, '');
-		onchange(digit ? Number(digit) : 0);
+		const digits = event.currentTarget.value.replace(/\D/g, '');
+		onchange(digits ? Number(digits) : 0);
 	}}
 />

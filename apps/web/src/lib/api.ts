@@ -73,18 +73,15 @@ function query(params: Record<string, string | number | undefined | null>): stri
 }
 
 export const api = {
-	// Auth
 	me: () => request<SessionInfo>('GET', '/api/auth/me'),
 	login: (password: string) => request<LoginResult>('POST', '/api/auth/login', { password }),
 	logout: () => request<{ ok: boolean }>('POST', '/api/auth/logout'),
 	changePassword: (current_password: string, new_password: string) =>
 		request<ChangePasswordResult>('POST', '/api/auth/password', { current_password, new_password }),
 
-	// Home
 	dashboard: (month?: string) => request<Dashboard>('GET', `/api/dashboard${query({ month })}`),
 	summary: (month?: string) => request<Summary>('GET', `/api/summary${query({ month })}`),
 
-	// Transaksi
 	transactions: (params: { month?: string; category_id?: number; q?: string; cursor?: number; limit?: number }) =>
 		request<{ transactions: Transaction[]; next_cursor: number | null }>('GET', `/api/transactions${query(params)}`),
 	createTransaction: (payload: {
@@ -99,7 +96,6 @@ export const api = {
 		request<Transaction>('PATCH', `/api/transactions/${id}`, payload),
 	deleteTransaction: (id: number) => request<{ ok: boolean }>('DELETE', `/api/transactions/${id}`),
 
-	// Kategori dan akun
 	categories: () => request<{ categories: Category[] }>('GET', '/api/categories'),
 	createCategory: (name: string, keywords: string[] = []) =>
 		request<Category>('POST', '/api/categories', { name, keywords }),
@@ -109,14 +105,12 @@ export const api = {
 	accounts: () => request<{ accounts: Account[] }>('GET', '/api/accounts'),
 	createAccount: (name: string) => request<Account>('POST', '/api/accounts', { name }),
 
-	// Budget
 	budgets: (month?: string) => request<{ budgets: BudgetRow[] }>('GET', `/api/budgets${query({ month })}`),
 	saveBudgets: (month: string, items: { category_id: number; amount: number }[]) =>
 		request<{ budgets: BudgetRow[] }>('PUT', '/api/budgets', { month, items }),
 	copyBudgets: (from: string, to: string) =>
 		request<{ ok: boolean; copied: number }>('POST', '/api/budgets/copy', { from, to }),
 
-	// Kebutuhan bulanan
 	recurringNeeds: () => request<{ recurring_needs: RecurringNeed[] }>('GET', '/api/recurring-needs'),
 	createRecurringNeed: (payload: { name: string; amount: number; due_day: number; category_id?: number | null }) =>
 		request<RecurringNeed>('POST', '/api/recurring-needs', payload),
@@ -129,7 +123,6 @@ export const api = {
 	payNeed: (id: number, amount?: number) => request<Need>('POST', `/api/needs/${id}/pay`, amount ? { amount } : {}),
 	unpayNeed: (id: number) => request<Need>('POST', `/api/needs/${id}/unpay`, {}),
 
-	// Hutang piutang
 	debts: (status?: string, person?: string) =>
 		request<{ debts: Debt[]; totals: DebtTotals }>('GET', `/api/debts${query({ status, person })}`),
 	createDebt: (payload: {
@@ -147,13 +140,11 @@ export const api = {
 			record_transaction: recordTransaction
 		}),
 
-	// Tutup bulan
 	months: () => request<{ closed_months: string[]; current_month: string }>('GET', '/api/months'),
 	monthPreview: (month: string) => request<MonthPreview>('GET', `/api/months/${month}/preview`),
 	closeMonth: (month: string) => request<Snapshot>('POST', `/api/months/${month}/close`, { confirm: true }),
 	reopenMonth: (month: string) => request<{ ok: boolean }>('POST', `/api/months/${month}/reopen`, { confirm: true }),
 
-	// Agent
 	chat: (message: string) => request<ChatReply>('POST', '/api/chat', { message }),
 	confirmAction: (id: string) => request<ChatReply>('POST', `/api/actions/${id}/confirm`, {}),
 	cancelAction: (id: string) => request<ChatReply>('POST', `/api/actions/${id}/cancel`, {})

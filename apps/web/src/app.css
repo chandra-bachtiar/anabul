@@ -5,7 +5,7 @@
 	logs: false;
 }
 
-/* Token mengikuti docs/UI_SPEC.md (krem hangat + oranye kucing). */
+/* Tokens follow docs/UI_SPEC.md (warm cream + cat orange). */
 @plugin 'daisyui/theme' {
 	name: 'anabul';
 	default: true;
@@ -108,17 +108,17 @@
 	--font-sans: 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif;
 	--font-display: 'Fredoka', 'Baloo 2', 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif;
 
-	/* Oranye terang primary (#FF9F43) hanya 2,6:1 di atas krem, jadi teks
-	   oranye memakai versi lebih gelap dari keluarga warna yang sama. */
+	/* Bright orange (#FF9F43) only reaches 2.6:1 on cream, so orange text uses a
+	   darker sibling of the same hue. */
 	--color-primary-ink: #b8531a;
 
-	/* Warna garis input, dinaikkan dari base-300 supaya batas kolom tetap
-	   terbaca (WCAG 1.4.11 meminta 3:1 untuk batas komponen). */
+	/* Input borders sit above base-300 so the field edge stays visible
+	   (WCAG 1.4.11 asks for 3:1 on component boundaries). */
 	--color-outline-warm: #8b6f5e;
 
-	/* Varian gelap untuk teks status: mint #3CC48B (2,2:1) dan merah #F0566A
-	   (3,4:1) gagal WCAG AA di atas permukaan putih. Nilai di bawah lolos
-	   4,5:1, sedangkan warna terangnya tetap dipakai untuk isian progress. */
+	/* Darker status text: mint #3CC48B (2.2:1) and red #F0566A (3.4:1) fail AA
+	   on white. The values below clear 4.5:1 while the bright ones stay in use
+	   for progress fills. */
 	--color-success-ink: #197a53;
 	--color-error-ink: #c02a3e;
 }
@@ -147,10 +147,9 @@ html {
 	border-color: var(--color-outline-warm);
 }
 
-/* Animasi ringan: transisi halaman, kartu yang baru muncul, umpan balik tekan,
-   dan konfeti saat momen senang. Semuanya berhenti kalau pengguna meminta
-   kurangi gerak. */
-@keyframes anabul-naik {
+/* Motion level 2 (docs/UI_SPEC.md): page transitions, entry stagger, press
+   feedback, confetti on happy moments. All of it yields to reduced motion. */
+@keyframes anabul-rise {
 	from {
 		opacity: 0;
 		transform: translateY(8px);
@@ -173,7 +172,7 @@ html {
 	}
 }
 
-@keyframes anabul-konfeti-jatuh {
+@keyframes anabul-confetti-fall {
 	0% {
 		opacity: 0;
 		transform: translateY(-12px) scale(0.6);
@@ -183,11 +182,11 @@ html {
 	}
 	100% {
 		opacity: 0;
-		transform: translateY(var(--jatuh, 160px)) rotate(var(--putar, 360deg));
+		transform: translateY(var(--fall, 160px)) rotate(var(--spin, 360deg));
 	}
 }
 
-@keyframes anabul-denyut {
+@keyframes anabul-pulse {
 	0%,
 	100% {
 		opacity: 1;
@@ -197,68 +196,68 @@ html {
 	}
 }
 
-.anim-naik {
-	animation: anabul-naik 0.26s ease-out both;
+.anim-rise {
+	animation: anabul-rise 0.26s ease-out both;
 }
 
 .anim-pop {
 	animation: anabul-pop 0.32s ease-out;
 }
 
-.anabul-konfeti {
-	animation: anabul-konfeti-jatuh 1.4s ease-in forwards;
+.anabul-confetti {
+	animation: anabul-confetti-fall 1.4s ease-in forwards;
 }
 
-/* Baris daftar muncul berurutan sedikit supaya tidak kaku. */
-.anim-daftar > * {
-	animation: anabul-naik 0.24s ease-out both;
+/* List rows arrive one after another so the screen does not feel stiff. */
+.anim-list > * {
+	animation: anabul-rise 0.24s ease-out both;
 }
-.anim-daftar > *:nth-child(2) {
+.anim-list > *:nth-child(2) {
 	animation-delay: 30ms;
 }
-.anim-daftar > *:nth-child(3) {
+.anim-list > *:nth-child(3) {
 	animation-delay: 60ms;
 }
-.anim-daftar > *:nth-child(4) {
+.anim-list > *:nth-child(4) {
 	animation-delay: 90ms;
 }
-.anim-daftar > *:nth-child(5) {
+.anim-list > *:nth-child(5) {
 	animation-delay: 120ms;
 }
 
-/* Sheet dan kartu terasa hidup saat disentuh. */
+/* Sheets and cards react to touch. */
 .modal-box {
-	animation: anabul-naik 0.22s ease-out;
+	animation: anabul-rise 0.22s ease-out;
 }
 
 .btn:active:not(:disabled) {
 	transform: scale(0.97);
 }
 
-.card-mengambang {
+.card-hover-lift {
 	transition:
 		transform 0.18s ease-out,
 		background-color 0.18s ease-out;
 }
-.card-mengambang:hover {
+.card-hover-lift:hover {
 	transform: translateY(-2px);
 }
 
 .skeleton {
-	animation: anabul-denyut 1.4s ease-in-out infinite;
+	animation: anabul-pulse 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.anim-naik,
+	.anim-rise,
 	.anim-pop,
-	.anabul-konfeti,
-	.anim-daftar > *,
+	.anabul-confetti,
+	.anim-list > *,
 	.modal-box,
 	.skeleton {
 		animation: none !important;
 	}
 	.btn:active:not(:disabled),
-	.card-mengambang:hover {
+	.card-hover-lift:hover {
 		transform: none;
 	}
 }

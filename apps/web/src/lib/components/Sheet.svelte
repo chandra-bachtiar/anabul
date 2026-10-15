@@ -14,10 +14,10 @@
 
 	let dialog = $state<HTMLDialogElement | null>(null);
 
-	// Setiap sheet butuh id unik karena satu halaman bisa punya beberapa sheet.
-	const idJudul = `judul-sheet-${Math.random().toString(36).slice(2, 8)}`;
+	// Ids must be unique, as one page can render several sheets.
+	const titleId = `sheet-title-${Math.random().toString(36).slice(2, 8)}`;
 
-	// Dialog bawaan browser sudah menangani Escape, fokus, dan backdrop.
+	// The native dialog already handles Escape, focus, and the backdrop.
 	$effect(() => {
 		const node = dialog;
 		if (!node) return;
@@ -32,13 +32,13 @@
 <dialog
 	bind:this={dialog}
 	class="modal modal-bottom sm:modal-middle"
-	aria-labelledby={idJudul}
+	aria-labelledby={titleId}
 	onclose={onclose}
 >
 	<div class="modal-box max-h-[88dvh] w-full max-w-md rounded-t-3xl sm:rounded-3xl">
 		<div class="flex items-start justify-between gap-3">
 			<div>
-				<h2 id={idJudul} class="font-display text-lg font-semibold">{title}</h2>
+				<h2 id={titleId} class="font-display text-lg font-semibold">{title}</h2>
 				{#if description}
 					<p class="mt-1 text-sm opacity-70">{description}</p>
 				{/if}

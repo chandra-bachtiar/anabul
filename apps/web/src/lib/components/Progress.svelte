@@ -3,14 +3,14 @@
 		value: number;
 		status?: 'ok' | 'warn' | 'over' | 'none';
 		label: string;
-		tebal?: boolean;
+		thick?: boolean;
 	}
 
-	let { value, status = 'ok', label, tebal = false }: Props = $props();
+	let { value, status = 'ok', label, thick = false }: Props = $props();
 
-	const terlihat = $derived(Math.max(0, Math.min(value, 100)));
+	const clamped = $derived(Math.max(0, Math.min(value, 100)));
 
-	const warna = $derived(
+	const color = $derived(
 		status === 'over'
 			? 'bg-error'
 			: status === 'warn'
@@ -22,7 +22,7 @@
 </script>
 
 <div
-	class="w-full overflow-hidden rounded-full bg-base-300 {tebal ? 'h-3' : 'h-2'}"
+	class="w-full overflow-hidden rounded-full bg-base-300 {thick ? 'h-3' : 'h-2'}"
 	role="progressbar"
 	aria-label={label}
 	aria-valuenow={Math.round(value)}
@@ -30,7 +30,7 @@
 	aria-valuemax={100}
 >
 	<div
-		class="h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none {warna}"
-		style="width: {terlihat}%"
+		class="h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none {color}"
+		style="width: {clamped}%"
 	></div>
 </div>

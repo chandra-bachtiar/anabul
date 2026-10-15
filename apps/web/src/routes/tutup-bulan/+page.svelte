@@ -6,66 +6,66 @@
 	import Progress from '#lib/components/Progress.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
-	import { bulanIni, formatRupiah, geserBulan, labelBulan, labelTanggalPendek } from '#lib/format';
-	import { getarSenang } from '#lib/haptic';
+	import { currentMonth, formatRupiah, shiftMonth, formatMonth, formatDateShort } from '#lib/format';
+	import { hapticCelebrate } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { MonthPreview, Snapshot } from '#lib/types';
 
-	let bulan = $state(bulanIni());
-	let pratinjau = $state<MonthPreview | null>(null);
-	let memuat = $state(true);
-	let pesanError = $state('');
-	let memproses = $state(false);
-	let konfirmasiTerbuka = $state(false);
-	let hasil = $state<Snapshot | null>(null);
-	let perayaan = $state(0);
+	let month = $state(currentMonth());
+	let preview = $state<MonthPreview | null>(null);
+	let loading = $state(true);
+	let errorMessage = $state('');
+	let processing = $state(false);
+	let confirmOpen = $state(false);
+	let result = $state<Snapshot | null>(null);
+	let celebration = $state(0);
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
-		hasil = null;
+	async function load() {
+		loading = true;
+		errorMessage = '';
+		result = null;
 		try {
-			pratinjau = await api.monthPreview(bulan);
+			preview = await api.monthPreview(month);
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat ringkasan bulan.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat ringkasan bulan.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
-	onMount(() => void muat());
+	onMount(() => void load());
 
 	$effect(() => {
-		bulan;
-		void muat();
+		month;
+		void load();
 	});
 
-	async function tutupBulan() {
-		memproses = true;
+	async function closeMonth() {
+		processing = true;
 		try {
-			hasil = await api.closeMonth(bulan);
-			konfirmasiTerbuka = false;
-			perayaan += 1;
-			getarSenang();
-			toast(`Bulan ${labelBulan(bulan)} sudah ditutup.`);
-			await muat();
+			result = await api.closeMonth(month);
+			confirmOpen = false;
+			celebration += 1;
+			hapticCelebrate();
+			toast(`Bulan ${formatMonth(month)} sudah ditutup.`);
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menutup bulan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function bukaKembali() {
-		memproses = true;
+	async function reopenMonth() {
+		processing = true;
 		try {
-			await api.reopenMonth(bulan);
-			toast(`Bulan ${labelBulan(bulan)} bisa diubah lagi.`);
-			await muat();
+			await api.reopenMonth(month);
+			toast(`Bulan ${formatMonth(month)} bisa diubah lagi.`);
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal membuka bulan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 </script>
@@ -74,50 +74,50 @@
 	<title>Tutup bulan — ANABUL</title>
 </svelte:head>
 
-<Confetti trigger={perayaan} />
+<Confetti trigger={celebration} />
 
 <div class="space-y-4">
 	<h1 class="font-display text-2xl font-semibold">Tutup bulan</h1>
 
 	<div class="flex items-center justify-between gap-2">
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, -1))} aria-label="Bulan sebelumnya">‹</button>
-		<span class="font-display text-base font-semibold">{labelBulan(bulan)}</span>
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, 1))} aria-label="Bulan berikutnya">›</button>
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, -1))} aria-label="Bulan sebelumnya">‹</button>
+		<span class="font-display text-base font-semibold">{formatMonth(month)}</span>
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, 1))} aria-label="Bulan berikutnya">›</button>
 	</div>
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
-	{:else if pratinjau}
-		{#if hasil}
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
+	{:else if preview}
+		{#if result}
 			<section class="card border border-success/40 bg-success/10" aria-labelledby="judul-hasil">
 				<div class="card-body flex-row items-center gap-3 p-4">
-					<Mascot mood="senang" size={56} alt="" />
+					<Mascot mood="happy" size={56} alt="" />
 					<div>
-						<h2 id="judul-hasil" class="font-display text-base font-semibold">Bulan {labelBulan(hasil.month)} terkunci</h2>
+						<h2 id="judul-hasil" class="font-display text-base font-semibold">Bulan {formatMonth(result.month)} terkunci</h2>
 						<p class="text-sm">
-							Pemasukan {formatRupiah(hasil.income)}, pengeluaran {formatRupiah(hasil.expense)}, selisih
-							{formatRupiah(hasil.net)}. Bulan berikutnya sudah disiapkan dengan {hasil.carried_budgets} budget
-							dan {hasil.carried_needs} kebutuhan.
+							Pemasukan {formatRupiah(result.income)}, pengeluaran {formatRupiah(result.expense)}, selisih
+							{formatRupiah(result.net)}. Bulan berikutnya sudah disiapkan dengan {result.carried_budgets} budget
+							dan {result.carried_needs} kebutuhan.
 						</p>
 					</div>
 				</div>
 			</section>
 		{/if}
 
-		{#if pratinjau.locked}
+		{#if preview.locked}
 			<section class="card border border-warning/50 bg-warning/10" aria-labelledby="judul-terkunci">
 				<div class="card-body flex-row items-start gap-3 p-4">
-					<Mascot mood="tidur" size={56} alt="" />
+					<Mascot mood="asleep" size={56} alt="" />
 					<div class="space-y-2">
 						<h2 id="judul-terkunci" class="font-display text-base font-semibold">Bulan ini terkunci</h2>
 						<p class="text-sm">
 							Transaksi dan budget bulan ini tidak bisa diubah. Buka kembali hanya kalau memang ada yang
 							perlu dikoreksi.
 						</p>
-						<button type="button" class="btn btn-outline min-h-11" onclick={bukaKembali} disabled={memproses}>
-							{memproses ? 'Membuka...' : 'Buka kembali bulan ini'}
+						<button type="button" class="btn btn-outline min-h-11" onclick={reopenMonth} disabled={processing}>
+							{processing ? 'Membuka...' : 'Buka kembali bulan ini'}
 						</button>
 					</div>
 				</div>
@@ -126,31 +126,31 @@
 
 		<section class="card bg-base-200" aria-labelledby="judul-ringkasan">
 			<div class="card-body gap-3 p-4">
-				<h2 id="judul-ringkasan" class="font-display text-base font-semibold">Ringkasan {pratinjau.month_label}</h2>
+				<h2 id="judul-ringkasan" class="font-display text-base font-semibold">Ringkasan {preview.month_label}</h2>
 				<dl class="grid grid-cols-3 gap-2 text-sm">
 					<div>
 						<dt class="text-xs opacity-70">Masuk</dt>
-						<dd class="font-display text-lg font-semibold tabular-nums text-success-ink">{formatRupiah(pratinjau.income)}</dd>
+						<dd class="font-display text-lg font-semibold tabular-nums text-success-ink">{formatRupiah(preview.income)}</dd>
 					</div>
 					<div class="text-center">
 						<dt class="text-xs opacity-70">Keluar</dt>
-						<dd class="font-display text-lg font-semibold tabular-nums text-error-ink">{formatRupiah(pratinjau.expense)}</dd>
+						<dd class="font-display text-lg font-semibold tabular-nums text-error-ink">{formatRupiah(preview.expense)}</dd>
 					</div>
 					<div class="text-right">
 						<dt class="text-xs opacity-70">Selisih</dt>
-						<dd class="font-display text-lg font-semibold tabular-nums">{formatRupiah(pratinjau.net)}</dd>
+						<dd class="font-display text-lg font-semibold tabular-nums">{formatRupiah(preview.net)}</dd>
 					</div>
 				</dl>
-				<p class="text-xs opacity-70">{pratinjau.categories.length} kategori terpakai, {pratinjau.budgets.length} budget diatur.</p>
+				<p class="text-xs opacity-70">{preview.categories.length} kategori terpakai, {preview.budgets.length} budget diatur.</p>
 			</div>
 		</section>
 
-		{#if pratinjau.budgets.length > 0}
-			<section class="card bg-base-200" aria-labelledby="judul-budget-tutup">
+		{#if preview.budgets.length > 0}
+			<section class="card bg-base-200" aria-labelledby="close-budget-title">
 				<div class="card-body gap-3 p-4">
-					<h2 id="judul-budget-tutup" class="font-display text-base font-semibold">Sisa budget per kategori</h2>
+					<h2 id="close-budget-title" class="font-display text-base font-semibold">Sisa budget per kategori</h2>
 					<ul class="space-y-3">
-						{#each pratinjau.budgets as item (item.category_id)}
+						{#each preview.budgets as item (item.category_id)}
 							<li class="space-y-1">
 								<div class="flex items-baseline justify-between gap-3 text-sm">
 									<span class="font-medium">{item.category_name}</span>
@@ -167,14 +167,14 @@
 			</section>
 		{/if}
 
-		{#if pratinjau.unpaid_need_rows.length > 0}
+		{#if preview.unpaid_need_rows.length > 0}
 			<section class="card bg-base-200" aria-labelledby="judul-belum-bayar">
 				<div class="card-body gap-2 p-4">
 					<h2 id="judul-belum-bayar" class="font-display text-base font-semibold">Kebutuhan belum dibayar</h2>
 					<ul class="space-y-1 text-sm">
-						{#each pratinjau.unpaid_need_rows as item (item.id)}
+						{#each preview.unpaid_need_rows as item (item.id)}
 							<li class="flex items-baseline justify-between gap-3">
-								<span>{item.name} · {labelTanggalPendek(item.due_date)}</span>
+								<span>{item.name} · {formatDateShort(item.due_date)}</span>
 								<span class="tabular-nums">{formatRupiah(item.amount)}</span>
 							</li>
 						{/each}
@@ -184,20 +184,20 @@
 			</section>
 		{/if}
 
-		{#if pratinjau.due_debts.length > 0 || pratinjau.debts.hutang > 0 || pratinjau.debts.piutang > 0}
+		{#if preview.due_debts.length > 0 || preview.debts.hutang > 0 || preview.debts.piutang > 0}
 			<section class="card bg-base-200" aria-labelledby="judul-hutang-tutup">
 				<div class="card-body gap-2 p-4">
 					<h2 id="judul-hutang-tutup" class="font-display text-base font-semibold">Hutang piutang berjalan</h2>
 					<p class="text-sm">
-						Hutang {formatRupiah(pratinjau.debts.hutang)} · piutang {formatRupiah(pratinjau.debts.piutang)}
+						Hutang {formatRupiah(preview.debts.hutang)} · piutang {formatRupiah(preview.debts.piutang)}
 					</p>
-					{#if pratinjau.due_debts.length > 0}
+					{#if preview.due_debts.length > 0}
 						<ul class="space-y-1 text-sm">
-							{#each pratinjau.due_debts as item (item.id)}
+							{#each preview.due_debts as item (item.id)}
 								<li class="flex items-baseline justify-between gap-3">
 									<span>
 										{item.direction === 'hutang' ? 'Bayar ke' : 'Tagih'} {item.person}
-										{#if item.due_date}· {labelTanggalPendek(item.due_date)}{/if}
+										{#if item.due_date}· {formatDateShort(item.due_date)}{/if}
 									</span>
 									<span class="tabular-nums">{formatRupiah(item.remaining)}</span>
 								</li>
@@ -208,32 +208,32 @@
 			</section>
 		{/if}
 
-		{#if pratinjau.warnings.length > 0}
+		{#if preview.warnings.length > 0}
 			<div class="card border border-info/40 bg-info/10">
 				<div class="card-body gap-2 p-4">
 					<h2 class="font-display text-base font-semibold">Sebelum ditutup, cek ini</h2>
 					<ul class="list-disc space-y-1 pl-5 text-sm">
-						{#each pratinjau.warnings as pesan, index (index)}
-							<li>{pesan}</li>
+						{#each preview.warnings as warning, index (index)}
+							<li>{warning}</li>
 						{/each}
 					</ul>
 				</div>
 			</div>
 		{/if}
 
-		{#if !pratinjau.locked}
-			<button type="button" class="btn btn-primary min-h-12 w-full text-base" onclick={() => (konfirmasiTerbuka = true)}>
-				Tutup bulan {labelBulan(bulan)}
+		{#if !preview.locked}
+			<button type="button" class="btn btn-primary min-h-12 w-full text-base" onclick={() => (confirmOpen = true)}>
+				Tutup bulan {formatMonth(month)}
 			</button>
 		{/if}
 	{/if}
 </div>
 
 <Sheet
-	open={konfirmasiTerbuka}
-	title={`Tutup ${labelBulan(bulan)}?`}
+	open={confirmOpen}
+	title={`Tutup ${formatMonth(month)}?`}
 	description="Setelah ditutup, transaksi bulan ini tidak bisa diubah lagi kecuali kamu buka kembali."
-	onclose={() => (konfirmasiTerbuka = false)}
+	onclose={() => (confirmOpen = false)}
 >
 	<div class="space-y-4">
 		<ul class="list-disc space-y-1 pl-5 text-sm">
@@ -243,9 +243,9 @@
 			<li>Sisa budget bulan ini hangus, tidak dibawa ke bulan depan.</li>
 		</ul>
 		<div class="flex justify-end gap-2">
-			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (konfirmasiTerbuka = false)}>Batal</button>
-			<button type="button" class="btn btn-primary min-h-11" onclick={tutupBulan} disabled={memproses}>
-				{memproses ? 'Menutup...' : 'Ya, tutup sekarang'}
+			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (confirmOpen = false)}>Batal</button>
+			<button type="button" class="btn btn-primary min-h-11" onclick={closeMonth} disabled={processing}>
+				{processing ? 'Menutup...' : 'Ya, tutup sekarang'}
 			</button>
 		</div>
 	</div>

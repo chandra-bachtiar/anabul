@@ -1,8 +1,8 @@
 import { api, ApiError } from './api';
 
 /**
- * Sesi disimpan di satu objek reaktif supaya layout, halaman, dan aksi
- * (login, logout, ganti password) membaca state yang sama.
+ * A single reactive object, so layout, pages, and the login/logout/change
+ * password actions all read the same session.
  */
 export const session = $state({
 	checked: false,
@@ -30,9 +30,9 @@ export async function checkSession(): Promise<void> {
 
 export async function login(password: string): Promise<void> {
 	try {
-		const hasil = await api.login(password);
+		const result = await api.login(password);
 		session.authenticated = true;
-		session.usingDefaultPassword = hasil.using_default_password ?? false;
+		session.usingDefaultPassword = result.using_default_password ?? false;
 		session.error = '';
 	} catch (error) {
 		throw new ApiError(

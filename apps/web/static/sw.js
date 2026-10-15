@@ -23,43 +23,43 @@ self.addEventListener('fetch', (event) => {
 	const url = new URL(event.request.url);
 	if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-	// Data keuangan selalu diambil dari server supaya tidak pernah basi.
+	// Financial data always comes from the server, so it can never go stale.
 	if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') return;
 
-	// Aset build Vite punya nama ber-hash, jadi isinya tidak pernah berubah.
+	// Vite build assets carry hashed names, so their content never changes.
 	if (url.pathname.startsWith('/_app/immutable/')) {
 		event.respondWith(
-			caches.match(event.request).then((tersimpan) => {
-				if (tersimpan) return tersimpan;
-				return fetch(event.request).then((respons) => {
-					if (respons.ok) {
-						const salinan = respons.clone();
-						caches.open(CACHE).then((cache) => cache.put(event.request, salinan));
+			caches.match(event.request).then((cached) => {
+				if (cached) return cached;
+				return fetch(event.request).then((response) => {
+					if (response.ok) {
+						const copy = response.clone();
+						caches.open(CACHE).then((cache) => cache.put(event.request, copy));
 					}
-					return respons;
+					return response;
 				});
 			})
 		);
 		return;
 	}
 
-	// Navigasi: utamakan jaringan supaya build baru langsung terpakai, dan
-	// simpan salinannya hanya sebagai cadangan saat offline.
+	// Navigation: prefer the network so a new build takes effect right away, and
+	// keep the copy only as an offline fallback.
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
 			fetch(event.request)
-				.then((respons) => {
-					if (respons.ok) {
-						const salinan = respons.clone();
-						caches.open(CACHE).then((cache) => cache.put('/', salinan));
+				.then((response) => {
+					if (response.ok) {
+						const copy = response.clone();
+						caches.open(CACHE).then((cache) => cache.put('/', copy));
 					}
-					return respons;
+					return response;
 				})
 				.catch(() => caches.match('/'))
 		);
 		return;
 	}
 
-	// Berkas lain: jaringan dulu, cache hanya sebagai cadangan.
+	// Everything else: network first, cache only as the fallback.
 	event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });

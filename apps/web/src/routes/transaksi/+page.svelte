@@ -5,33 +5,33 @@
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { onChatChange } from '#lib/chat.svelte';
-	import { getarRingan } from '#lib/haptic';
+	import { hapticLight } from '#lib/haptic';
 	import {
-		bulanDariTanggal,
-		bulanIni,
+		monthFromDateInput,
+		currentMonth,
 		formatRupiah,
-		geserBulan,
-		isoDariTanggal,
-		labelBulan,
-		labelHari,
-		labelJam,
-		tanggalInput,
-		tanggalKemarin
+		shiftMonth,
+		isoFromDateInput,
+		formatMonth,
+		formatDay,
+		formatTime,
+		toDateInputValue,
+		yesterdayInputValue
 	} from '#lib/format';
 	import { toast } from '#lib/toast.svelte';
 	import type { Account, Category, Transaction } from '#lib/types';
 
-	let bulan = $state(bulanIni());
-	let daftar = $state<Transaction[]>([]);
-	let kategori = $state<Category[]>([]);
-	let akun = $state<Account[]>([]);
-	let kursor = $state<number | null>(null);
-	let memuat = $state(true);
-	let memuatLagi = $state(false);
-	let pesanError = $state('');
+	let month = $state(currentMonth());
+	let transactions = $state<Transaction[]>([]);
+	let categories = $state<Category[]>([]);
+	let accounts = $state<Account[]>([]);
+	let cursor = $state<number | null>(null);
+	let loading = $state(true);
+	let loadingMore = $state(false);
+	let errorMessage = $state('');
 
-	let pencarian = $state('');
-	let filterKategori = $state<number | 0>(0);
+	let searchQuery = $state('');
+	let categoryFilter = $state<number | 0>(0);
 
 	let editor = $state<Transaction | null>(null);
 	let form = $state({
@@ -40,126 +40,125 @@
 		note: '',
 		category_id: 0,
 		account_id: 0,
-		tanggal: tanggalInput()
+		date: toDateInputValue()
 	});
-	let simpanProses = $state(false);
+	let saving = $state(false);
 
-	let tambahTerbuka = $state(false);
-	let formBaru = $state({
+	let addSheetOpen = $state(false);
+	let newForm = $state({
 		type: 'expense',
 		amount: 0,
 		note: '',
 		category_id: 0,
 		account_id: 0,
-		tanggal: tanggalInput()
+		date: toDateInputValue()
 	});
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
+	async function load() {
+		loading = true;
+		errorMessage = '';
 		try {
-			const hasil = await api.transactions({
-				month: bulan,
-				q: pencarian.trim() || undefined,
-				category_id: filterKategori || undefined,
+			const result = await api.transactions({
+				month,
+				q: searchQuery.trim() || undefined,
+				category_id: categoryFilter || undefined,
 				limit: 60
 			});
-			daftar = hasil.transactions;
-			kursor = hasil.next_cursor;
+			transactions = result.transactions;
+			cursor = result.next_cursor;
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat transaksi.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat transaksi.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
-	async function muatLagi() {
-		if (!kursor || memuatLagi) return;
-		memuatLagi = true;
+	async function loadMore() {
+		if (!cursor || loadingMore) return;
+		loadingMore = true;
 		try {
-			const hasil = await api.transactions({
-				month: bulan,
-				q: pencarian.trim() || undefined,
-				category_id: filterKategori || undefined,
-				cursor: kursor,
+			const result = await api.transactions({
+				month,
+				q: searchQuery.trim() || undefined,
+				category_id: categoryFilter || undefined,
+				cursor,
 				limit: 60
 			});
-			daftar = [...daftar, ...hasil.transactions];
-			kursor = hasil.next_cursor;
+			transactions = [...transactions, ...result.transactions];
+			cursor = result.next_cursor;
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal memuat lanjutan.', 'error');
 		} finally {
-			memuatLagi = false;
+			loadingMore = false;
 		}
 	}
 
 	onMount(() => {
 		void (async () => {
 			try {
-				const [kategoriHasil, akunHasil] = await Promise.all([api.categories(), api.accounts()]);
-				kategori = kategoriHasil.categories;
-				akun = akunHasil.accounts;
+				const [categoriesResult, accountsResult] = await Promise.all([api.categories(), api.accounts()]);
+				categories = categoriesResult.categories;
+				accounts = accountsResult.accounts;
 			} catch {
 				toast('Gagal memuat daftar kategori dan akun.', 'error');
 			}
 		})();
 
-		return onChatChange(() => void muat());
+		return onChatChange(() => void load());
 	});
 
 	$effect(() => {
-		bulan;
-		filterKategori;
-		void muat();
+		month;
+		categoryFilter;
+		void load();
 	});
 
-	let timerCari: ReturnType<typeof setTimeout> | undefined;
-	function cariBerubah(nilai: string) {
-		pencarian = nilai;
-		clearTimeout(timerCari);
-		timerCari = setTimeout(() => void muat(), 350);
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	function onSearchInput(value: string) {
+		searchQuery = value;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => void load(), 350);
 	}
 
-	const kelompok = $derived.by(() => {
-		const hasil: { judul: string; items: Transaction[] }[] = [];
-		for (const item of daftar) {
-			const judul = labelHari(item.occurred_at);
-			const terakhir = hasil[hasil.length - 1];
-			if (terakhir && terakhir.judul === judul) {
-				terakhir.items.push(item);
+	const groups = $derived.by(() => {
+		const result: { title: string; items: Transaction[] }[] = [];
+		for (const item of transactions) {
+			const title = formatDay(item.occurred_at);
+			const last = result[result.length - 1];
+			if (last && last.title === title) {
+				last.items.push(item);
 			} else {
-				hasil.push({ judul, items: [item] });
+				result.push({ title, items: [item] });
 			}
 		}
-		return hasil;
+		return result;
 	});
 
-	function bukaEditor(transaksi: Transaction) {
-		editor = transaksi;
+	function openEditor(transaction: Transaction) {
+		editor = transaction;
 		form = {
-			type: transaksi.type,
-			amount: transaksi.amount,
-			note: transaksi.note,
-			category_id: transaksi.category_id ?? 0,
-			account_id: transaksi.account_id ?? 0,
-			tanggal: tanggalInput(transaksi.occurred_at)
+			type: transaction.type,
+			amount: transaction.amount,
+			note: transaction.note,
+			category_id: transaction.category_id ?? 0,
+			account_id: transaction.account_id ?? 0,
+			date: toDateInputValue(transaction.occurred_at)
 		};
 	}
 
-	// Catatan yang tanggalnya pindah bulan tidak akan terlihat di daftar bulan
-	// yang sedang dibuka, jadi pemakai diberi tahu tujuannya ke mana.
-	function beriTahuPindahBulan(tanggal: string) {
-		const bulanTujuan = bulanDariTanggal(tanggal);
-		if (bulanTujuan !== bulan) {
-			toast(`Tersimpan di ${labelBulan(bulanTujuan)}.`);
+	// A record dated into another month leaves the open list, so tell the user where it landed.
+	function notifyMonthChange(date: string) {
+		const targetMonth = monthFromDateInput(date);
+		if (targetMonth !== month) {
+			toast(`Tersimpan di ${formatMonth(targetMonth)}.`);
 			return true;
 		}
 		return false;
 	}
 
-	async function simpanEdit() {
+	async function saveEdit() {
 		if (!editor) return;
-		simpanProses = true;
+		saving = true;
 		try {
 			await api.updateTransaction(editor.id, {
 				type: form.type,
@@ -169,78 +168,77 @@
 				account_id: form.account_id || null,
 				clear_category: form.category_id === 0,
 				clear_account: form.account_id === 0,
-				// Jam aslinya dipertahankan, yang berubah hanya tanggalnya.
-				occurred_at: isoDariTanggal(form.tanggal, editor.occurred_at)
+				// Only the date changes; the original time of day is preserved.
+				occurred_at: isoFromDateInput(form.date, editor.occurred_at)
 			});
-			const pindahBulan = beriTahuPindahBulan(form.tanggal);
+			const monthChanged = notifyMonthChange(form.date);
 			editor = null;
-			getarRingan();
-			if (!pindahBulan) toast('Perubahan tersimpan.');
-			await muat();
+			hapticLight();
+			if (!monthChanged) toast('Perubahan tersimpan.');
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan perubahan.', 'error');
 		} finally {
-			simpanProses = false;
+			saving = false;
 		}
 	}
 
-	async function hapus(transaksi: Transaction) {
+	async function remove(transaction: Transaction) {
 		try {
-			await api.deleteTransaction(transaksi.id);
+			await api.deleteTransaction(transaction.id);
 			editor = null;
 			toast('Transaksi dihapus.');
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menghapus transaksi.', 'error');
 		}
 	}
 
-	// Saat sedang melihat bulan lain, tanggal awal diarahkan ke bulan itu supaya
-	// catatan baru tidak diam-diam masuk ke bulan sekarang.
-	function tanggalAwal() {
-		return bulan === bulanIni() ? tanggalInput() : `${bulan}-01`;
+	// While viewing another month, new entries default there instead of silently using today.
+	function defaultDate() {
+		return month === currentMonth() ? toDateInputValue() : `${month}-01`;
 	}
 
-	function bukaTambah() {
-		formBaru = {
+	function openAdd() {
+		newForm = {
 			type: 'expense',
 			amount: 0,
 			note: '',
 			category_id: 0,
 			account_id: 0,
-			tanggal: tanggalAwal()
+			date: defaultDate()
 		};
-		tambahTerbuka = true;
+		addSheetOpen = true;
 	}
 
-	async function tambah() {
-		simpanProses = true;
+	async function createTransaction() {
+		saving = true;
 		try {
 			await api.createTransaction({
-				type: formBaru.type,
-				amount: formBaru.amount,
-				note: formBaru.note,
-				category_id: formBaru.category_id || null,
-				account_id: formBaru.account_id || null,
-				occurred_at: isoDariTanggal(formBaru.tanggal)
+				type: newForm.type,
+				amount: newForm.amount,
+				note: newForm.note,
+				category_id: newForm.category_id || null,
+				account_id: newForm.account_id || null,
+				occurred_at: isoFromDateInput(newForm.date)
 			});
-			const pindahBulan = beriTahuPindahBulan(formBaru.tanggal);
-			tambahTerbuka = false;
-			formBaru = {
+			const monthChanged = notifyMonthChange(newForm.date);
+			addSheetOpen = false;
+			newForm = {
 				type: 'expense',
 				amount: 0,
 				note: '',
 				category_id: 0,
 				account_id: 0,
-				tanggal: tanggalAwal()
+				date: defaultDate()
 			};
-			getarRingan();
-			if (!pindahBulan) toast('Catatan baru tersimpan.');
-			await muat();
+			hapticLight();
+			if (!monthChanged) toast('Catatan baru tersimpan.');
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan catatan.', 'error');
 		} finally {
-			simpanProses = false;
+			saving = false;
 		}
 	}
 </script>
@@ -252,82 +250,82 @@
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="font-display text-2xl font-semibold">Transaksi</h1>
-		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={bukaTambah}>
+		<button type="button" class="btn btn-primary btn-sm min-h-11" onclick={openAdd}>
 			Tambah manual
 		</button>
 	</header>
 
 	<div class="flex items-center justify-between gap-2">
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, -1))} aria-label="Bulan sebelumnya">
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, -1))} aria-label="Bulan sebelumnya">
 			‹
 		</button>
-		<span class="font-display text-base font-semibold">{labelBulan(bulan)}</span>
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, 1))} aria-label="Bulan berikutnya">
+		<span class="font-display text-base font-semibold">{formatMonth(month)}</span>
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, 1))} aria-label="Bulan berikutnya">
 			›
 		</button>
 	</div>
 
 	<div class="flex flex-col gap-2 sm:flex-row">
 		<div class="flex-1">
-			<label class="sr-only" for="cari-transaksi">Cari catatan</label>
+			<label class="sr-only" for="transaction-search">Cari catatan</label>
 			<input
-				id="cari-transaksi"
+				id="transaction-search"
 				type="search"
 				class="input input-bordered min-h-11 w-full"
 				placeholder="Cari catatan, mis. kopi"
-				value={pencarian}
-				oninput={(event) => cariBerubah(event.currentTarget.value)}
+				value={searchQuery}
+				oninput={(event) => onSearchInput(event.currentTarget.value)}
 			/>
 		</div>
 		<div>
-			<label class="sr-only" for="filter-kategori">Filter kategori</label>
-			<select id="filter-kategori" class="select select-bordered min-h-11 w-full sm:w-44" bind:value={filterKategori}>
+			<label class="sr-only" for="category-filter">Filter kategori</label>
+			<select id="category-filter" class="select select-bordered min-h-11 w-full sm:w-44" bind:value={categoryFilter}>
 				<option value={0}>Semua kategori</option>
-				{#each kategori as item (item.id)}
+				{#each categories as item (item.id)}
 					<option value={item.id}>{item.name}</option>
 				{/each}
 			</select>
 		</div>
 	</div>
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
-	{:else if daftar.length === 0}
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
+	{:else if transactions.length === 0}
 		<StateBlock
 			state="empty"
 			title="Belum ada transaksi di bulan ini"
 			message="Coba ganti bulan, ubah filter, atau catat lewat obrolan di Home."
 			actionLabel="Tambah manual"
-			onaction={bukaTambah}
+			onaction={openAdd}
 		/>
 	{:else}
 		<div class="space-y-4">
-			{#each kelompok as grup (grup.judul)}
-				<section aria-label={grup.judul}>
-					<h2 class="mb-2 text-xs font-semibold tracking-wide uppercase opacity-70">{grup.judul}</h2>
-					<ul class="anim-daftar space-y-2">
-						{#each grup.items as transaksi (transaksi.id)}
+			{#each groups as group (group.title)}
+				<section aria-label={group.title}>
+					<h2 class="mb-2 text-xs font-semibold tracking-wide uppercase opacity-70">{group.title}</h2>
+					<ul class="anim-list space-y-2">
+						{#each group.items as transaction (transaction.id)}
 							<li class="card bg-base-200">
 								<button
 									type="button"
 									class="w-full rounded-box text-left transition-colors hover:bg-base-300/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-									onclick={() => bukaEditor(transaksi)}
+									onclick={() => openEditor(transaction)}
 								>
 									<div class="card-body flex-row items-center justify-between gap-3 p-4">
 										<div class="min-w-0">
-											<p class="truncate font-medium">{transaksi.note || 'Tanpa catatan'}</p>
+											<p class="truncate font-medium">{transaction.note || 'Tanpa catatan'}</p>
 											<p class="text-xs opacity-70">
-												{labelJam(transaksi.occurred_at)}
-												{#if transaksi.category_name}· {transaksi.category_name}{/if}
-												{#if transaksi.account_name}· {transaksi.account_name}{/if}
-												{#if transaksi.source === 'telegram'}· dari Telegram{/if}
-												{#if transaksi.source === 'need'}· dari kebutuhan{/if}
+												{formatTime(transaction.occurred_at)}
+												{#if transaction.category_name}· {transaction.category_name}{/if}
+												{#if transaction.account_name}· {transaction.account_name}{/if}
+												{#if transaction.source === 'telegram'}· dari Telegram{/if}
+												{#if transaction.source === 'need'}· dari kebutuhan{/if}
 											</p>
 										</div>
-										<span class="font-display text-base font-semibold tabular-nums {transaksi.type === 'income' ? 'text-success-ink' : 'text-error-ink'}">
-											{transaksi.type === 'income' ? '+' : '-'}{formatRupiah(transaksi.amount)}
+										<span class="font-display text-base font-semibold tabular-nums {transaction.type === 'income' ? 'text-success-ink' : 'text-error-ink'}">
+											{transaction.type === 'income' ? '+' : '-'}{formatRupiah(transaction.amount)}
 										</span>
 									</div>
 								</button>
@@ -337,9 +335,9 @@
 				</section>
 			{/each}
 
-			{#if kursor}
-				<button type="button" class="btn btn-outline min-h-11 w-full" onclick={muatLagi} disabled={memuatLagi}>
-					{memuatLagi ? 'Memuat...' : 'Muat lebih banyak'}
+			{#if cursor}
+				<button type="button" class="btn btn-outline min-h-11 w-full" onclick={loadMore} disabled={loadingMore}>
+					{loadingMore ? 'Memuat...' : 'Muat lebih banyak'}
 				</button>
 			{/if}
 		</div>
@@ -349,14 +347,14 @@
 <Sheet
 	open={editor !== null}
 	title="Ubah catatan"
-	description={editor ? `Dibuat ${labelHari(editor.occurred_at)} ${labelJam(editor.occurred_at)}` : ''}
+	description={editor ? `Dibuat ${formatDay(editor.occurred_at)} ${formatTime(editor.occurred_at)}` : ''}
 	onclose={() => (editor = null)}
 >
 	<form
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void simpanEdit();
+			void saveEdit();
 		}}
 	>
 		<div class="grid grid-cols-2 gap-2">
@@ -376,13 +374,13 @@
 		</div>
 
 		<div>
-			<label class="label pb-1 text-sm font-semibold" for="edit-tanggal">Tanggal catatan</label>
-			<input id="edit-tanggal" type="date" class="input input-bordered min-h-11 w-full" bind:value={form.tanggal} required />
+			<label class="label pb-1 text-sm font-semibold" for="edit-date">Tanggal catatan</label>
+			<input id="edit-date" type="date" class="input input-bordered min-h-11 w-full" bind:value={form.date} required />
 			<div class="mt-2 flex flex-wrap gap-2">
-				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.tanggal = tanggalInput())}>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.date = toDateInputValue())}>
 					Hari ini
 				</button>
-				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.tanggal = tanggalKemarin())}>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (form.date = yesterdayInputValue())}>
 					Kemarin
 				</button>
 			</div>
@@ -401,7 +399,7 @@
 				<label class="label pb-1 text-sm font-semibold" for="edit-kategori">Kategori</label>
 				<select id="edit-kategori" class="select select-bordered min-h-11 w-full" bind:value={form.category_id}>
 					<option value={0}>Tanpa kategori</option>
-					{#each kategori as item (item.id)}
+					{#each categories as item (item.id)}
 						<option value={item.id}>{item.name}</option>
 					{/each}
 				</select>
@@ -410,7 +408,7 @@
 				<label class="label pb-1 text-sm font-semibold" for="edit-akun">Akun</label>
 				<select id="edit-akun" class="select select-bordered min-h-11 w-full" bind:value={form.account_id}>
 					<option value={0}>Tanpa akun</option>
-					{#each akun as item (item.id)}
+					{#each accounts as item (item.id)}
 						<option value={item.id}>{item.name}</option>
 					{/each}
 				</select>
@@ -421,53 +419,53 @@
 			<button
 				type="button"
 				class="btn btn-ghost min-h-11 text-error-ink"
-				disabled={simpanProses}
-				onclick={() => editor && void hapus(editor)}
+				disabled={saving}
+				onclick={() => editor && void remove(editor)}
 			>
 				Hapus
 			</button>
 			<div class="flex gap-2">
 				<button type="button" class="btn btn-ghost min-h-11" onclick={() => (editor = null)}>Batal</button>
-				<button type="submit" class="btn btn-primary min-h-11" disabled={simpanProses || form.amount <= 0}>
-					{simpanProses ? 'Menyimpan...' : 'Simpan'}
+				<button type="submit" class="btn btn-primary min-h-11" disabled={saving || form.amount <= 0}>
+					{saving ? 'Menyimpan...' : 'Simpan'}
 				</button>
 			</div>
 		</div>
 	</form>
 </Sheet>
 
-<Sheet open={tambahTerbuka} title="Catat manual" description="Buat catatan tanpa lewat obrolan." onclose={() => (tambahTerbuka = false)}>
+<Sheet open={addSheetOpen} title="Catat manual" description="Buat catatan tanpa lewat obrolan." onclose={() => (addSheetOpen = false)}>
 	<form
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void tambah();
+			void createTransaction();
 		}}
 	>
 		<div class="grid grid-cols-2 gap-2">
 			<label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-base-300 px-3">
-				<input type="radio" class="radio" bind:group={formBaru.type} value="expense" />
+				<input type="radio" class="radio" bind:group={newForm.type} value="expense" />
 				<span class="text-sm font-medium">Pengeluaran</span>
 			</label>
 			<label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-base-300 px-3">
-				<input type="radio" class="radio" bind:group={formBaru.type} value="income" />
+				<input type="radio" class="radio" bind:group={newForm.type} value="income" />
 				<span class="text-sm font-medium">Pemasukan</span>
 			</label>
 		</div>
 
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="baru-nominal">Nominal</label>
-			<MoneyInput id="baru-nominal" value={formBaru.amount} onchange={(value) => (formBaru.amount = value)} required />
+			<MoneyInput id="baru-nominal" value={newForm.amount} onchange={(value) => (newForm.amount = value)} required />
 		</div>
 
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="baru-tanggal">Tanggal catatan</label>
-			<input id="baru-tanggal" type="date" class="input input-bordered min-h-11 w-full" bind:value={formBaru.tanggal} required />
+			<input id="baru-tanggal" type="date" class="input input-bordered min-h-11 w-full" bind:value={newForm.date} required />
 			<div class="mt-2 flex flex-wrap gap-2">
-				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (formBaru.tanggal = tanggalInput())}>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (newForm.date = toDateInputValue())}>
 					Hari ini
 				</button>
-				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (formBaru.tanggal = tanggalKemarin())}>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={() => (newForm.date = yesterdayInputValue())}>
 					Kemarin
 				</button>
 			</div>
@@ -478,24 +476,24 @@
 
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="baru-catatan">Catatan</label>
-			<input id="baru-catatan" class="input input-bordered min-h-11 w-full" placeholder="mis. kopi" bind:value={formBaru.note} />
+			<input id="baru-catatan" class="input input-bordered min-h-11 w-full" placeholder="mis. kopi" bind:value={newForm.note} />
 		</div>
 
 		<div class="grid gap-3 sm:grid-cols-2">
 			<div>
 				<label class="label pb-1 text-sm font-semibold" for="baru-kategori">Kategori</label>
-				<select id="baru-kategori" class="select select-bordered min-h-11 w-full" bind:value={formBaru.category_id}>
+				<select id="baru-kategori" class="select select-bordered min-h-11 w-full" bind:value={newForm.category_id}>
 					<option value={0}>Tebak dari catatan</option>
-					{#each kategori as item (item.id)}
+					{#each categories as item (item.id)}
 						<option value={item.id}>{item.name}</option>
 					{/each}
 				</select>
 			</div>
 			<div>
 				<label class="label pb-1 text-sm font-semibold" for="baru-akun">Akun</label>
-				<select id="baru-akun" class="select select-bordered min-h-11 w-full" bind:value={formBaru.account_id}>
+				<select id="baru-akun" class="select select-bordered min-h-11 w-full" bind:value={newForm.account_id}>
 					<option value={0}>Tanpa akun</option>
-					{#each akun as item (item.id)}
+					{#each accounts as item (item.id)}
 						<option value={item.id}>{item.name}</option>
 					{/each}
 				</select>
@@ -503,9 +501,9 @@
 		</div>
 
 		<div class="flex justify-end gap-2">
-			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (tambahTerbuka = false)}>Batal</button>
-			<button type="submit" class="btn btn-primary min-h-11" disabled={simpanProses || formBaru.amount <= 0}>
-				{simpanProses ? 'Menyimpan...' : 'Simpan'}
+			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (addSheetOpen = false)}>Batal</button>
+			<button type="submit" class="btn btn-primary min-h-11" disabled={saving || newForm.amount <= 0}>
+				{saving ? 'Menyimpan...' : 'Simpan'}
 			</button>
 		</div>
 	</form>

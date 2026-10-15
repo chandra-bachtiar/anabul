@@ -1,30 +1,30 @@
 <script lang="ts">
 	interface Props {
-		mood?: 'senang' | 'khawatir' | 'tidur';
+		mood?: 'happy' | 'worried' | 'asleep';
 		size?: number;
 		alt?: string;
 		class?: string;
 	}
 
-	let { mood = 'senang', size = 64, alt, class: className = '' }: Props = $props();
+	let { mood = 'happy', size = 64, alt, class: className = '' }: Props = $props();
 
-	const sumber: Record<string, string> = {
-		senang: '/mascot-senang.svg',
-		khawatir: '/mascot-khawatir.svg',
-		tidur: '/mascot-tidur.svg'
+	const sources: Record<string, string> = {
+		happy: '/mascot-happy.svg',
+		worried: '/mascot-worried.svg',
+		asleep: '/mascot-asleep.svg'
 	};
 
-	const label: Record<string, string> = {
-		senang: 'Maskot ANABUL sedang senang',
-		khawatir: 'Maskot ANABUL khawatir karena budget menipis',
-		tidur: 'Maskot ANABUL tidur'
+	const altTexts: Record<string, string> = {
+		happy: 'Maskot ANABUL sedang senang',
+		worried: 'Maskot ANABUL khawatir karena budget menipis',
+		asleep: 'Maskot ANABUL tidur'
 	};
 </script>
 
 <img
-	src={sumber[mood] ?? sumber.senang}
+	src={sources[mood] ?? sources.happy}
 	width={size}
 	height={size}
-	alt={alt ?? label[mood] ?? ''}
+	alt={alt ?? altTexts[mood] ?? ''}
 	class="shrink-0 select-none {className}"
 />

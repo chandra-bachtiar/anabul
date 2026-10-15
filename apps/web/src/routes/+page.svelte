@@ -9,73 +9,73 @@
 	import StateBlock from '#lib/components/StateBlock.svelte';
 	import { onChatChange } from '#lib/chat.svelte';
 	import Confetti from '#lib/components/Confetti.svelte';
-	import { getarRingan } from '#lib/haptic';
+	import { hapticLight } from '#lib/haptic';
 	import { session } from '#lib/session.svelte';
 	import {
-		bulanIni,
+		currentMonth,
 		formatRupiah,
-		geserBulan,
-		labelBulan,
-		labelHari,
-		labelTanggalPendek,
-		statusBudgetLabel
+		shiftMonth,
+		formatMonth,
+		formatDay,
+		formatDateShort,
+		budgetStatusLabel
 	} from '#lib/format';
 	import { toast } from '#lib/toast.svelte';
 	import type { Dashboard, Need } from '#lib/types';
 
-	let bulan = $state(bulanIni());
+	let month = $state(currentMonth());
 	let data = $state<Dashboard | null>(null);
-	let memuat = $state(true);
-	let pesanError = $state('');
+	let loading = $state(true);
+	let errorMessage = $state('');
 
-	let perluDibayar = $state<Need | null>(null);
-	let nominalBayar = $state(0);
-	let perayaan = $state(0);
+	let needToPay = $state<Need | null>(null);
+	let paymentAmount = $state(0);
+	let celebration = $state(0);
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
+	async function load() {
+		loading = true;
+		errorMessage = '';
 		try {
-			data = await api.dashboard(bulan);
+			data = await api.dashboard(month);
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat data bulan ini.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat data bulan ini.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
 	$effect(() => {
-		bulan;
-		void muat();
+		month;
+		void load();
 	});
 
-	onMount(() => onChatChange(() => void muat()));
+	onMount(() => onChatChange(() => void load()));
 
-	function gantiBulan(delta: number) {
-		bulan = geserBulan(bulan, delta);
+	function changeMonth(delta: number) {
+		month = shiftMonth(month, delta);
 	}
 
-	function bukaBayar(need: Need) {
-		perluDibayar = need;
-		nominalBayar = need.amount;
+	function openPayment(need: Need) {
+		needToPay = need;
+		paymentAmount = need.amount;
 	}
 
-	async function bayar() {
-		if (!perluDibayar) return;
-		const need = perluDibayar;
-		perluDibayar = null;
+	async function pay() {
+		if (!needToPay) return;
+		const need = needToPay;
+		needToPay = null;
 		try {
-			await api.payNeed(need.id, nominalBayar);
-			perayaan += 1;
-			getarRingan();
+			await api.payNeed(need.id, paymentAmount);
+			celebration += 1;
+			hapticLight();
 			toast(`${need.name} ditandai lunas dan masuk pengeluaran.`);
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menandai lunas.', 'error');
 		}
 	}
 
-	const bulanBerjalan = $derived(bulan === bulanIni());
+	const isCurrentMonth = $derived(month === currentMonth());
 </script>
 
 <svelte:head>
@@ -85,7 +85,7 @@
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-3">
 		<div class="flex items-center gap-3">
-			<Mascot mood={data?.mood ?? 'senang'} size={56} />
+			<Mascot mood={data?.mood ?? 'happy'} size={56} />
 			<div>
 				<h1 class="font-display text-2xl font-semibold tracking-wide text-primary-ink">ANABUL</h1>
 				<p class="text-xs opacity-70">Asisten Ngatur Anggaran Bulanan</p>
@@ -97,7 +97,7 @@
 		<button
 			type="button"
 			class="btn btn-ghost btn-sm min-h-11 px-2"
-			onclick={() => gantiBulan(-1)}
+			onclick={() => changeMonth(-1)}
 			aria-label="Lihat bulan sebelumnya"
 		>
 			<svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
@@ -106,7 +106,7 @@
 		</button>
 
 		<div class="flex items-center gap-2">
-			<span class="font-display text-base font-semibold">{labelBulan(bulan)}</span>
+			<span class="font-display text-base font-semibold">{formatMonth(month)}</span>
 			{#if data?.locked}
 				<span class="badge badge-warning badge-sm gap-1 font-semibold">
 					<svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" aria-hidden="true">
@@ -119,15 +119,15 @@
 		</div>
 
 		<div class="flex items-center gap-1">
-			{#if !bulanBerjalan}
-				<button type="button" class="btn btn-ghost btn-sm min-h-11" onclick={() => (bulan = bulanIni())}>
+			{#if !isCurrentMonth}
+				<button type="button" class="btn btn-ghost btn-sm min-h-11" onclick={() => (month = currentMonth())}>
 					Bulan ini
 				</button>
 			{/if}
 			<button
 				type="button"
 				class="btn btn-ghost btn-sm min-h-11 px-2"
-				onclick={() => gantiBulan(1)}
+				onclick={() => changeMonth(1)}
 				aria-label="Lihat bulan berikutnya"
 			>
 				<svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" aria-hidden="true">
@@ -141,7 +141,7 @@
 		<div class="card border border-warning/60 bg-warning/10">
 			<div class="card-body gap-3 p-4">
 				<div class="flex items-start gap-3">
-					<Mascot mood="khawatir" size={44} alt="" />
+					<Mascot mood="worried" size={44} alt="" />
 					<div>
 						<h2 class="font-display text-base font-semibold">Passwordnya masih default</h2>
 						<p class="mt-1 text-sm">
@@ -157,15 +157,15 @@
 		</div>
 	{/if}
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
 	{:else if data}
 		{#if data.locked}
 			<div class="card border border-warning/50 bg-warning/10">
 				<div class="card-body flex-row items-center gap-3 p-4">
-					<Mascot mood="tidur" size={44} alt="" />
+					<Mascot mood="asleep" size={44} alt="" />
 					<p class="text-sm">
 						Bulan ini sudah ditutup, jadi catatan tidak bisa diubah. Buka kuncinya dari halaman
 						<a class="link font-semibold" href="/tutup-bulan">Tutup bulan</a> kalau perlu koreksi.
@@ -174,12 +174,11 @@
 			</div>
 		{/if}
 
-		<!-- Fokus utama halaman: sisa budget bulan ini. -->
-		<section class="card bg-base-200" aria-labelledby="judul-budget">
+		<section class="card bg-base-200" aria-labelledby="budget-title">
 			<div class="card-body gap-3">
 				<div class="flex items-start justify-between gap-3">
 					<div>
-						<h2 id="judul-budget" class="text-sm font-semibold opacity-70">Sisa budget bulan ini</h2>
+						<h2 id="budget-title" class="text-sm font-semibold opacity-70">Sisa budget bulan ini</h2>
 						{#key data.budget_remaining}
 							<p class="anim-pop font-display text-4xl leading-tight font-semibold tabular-nums">
 								{formatRupiah(data.budget_remaining)}
@@ -187,31 +186,31 @@
 						{/key}
 					</div>
 					{#if data.budget_status === 'warn' || data.budget_status === 'over'}
-						<Mascot mood="khawatir" size={64} />
+						<Mascot mood="worried" size={64} />
 					{/if}
 				</div>
 
 				{#if data.budget_total === 0}
 					<div class="space-y-2">
 						<p class="text-sm opacity-80">Belum ada budget bulan ini, jadi angka di atas masih kosong.</p>
-						<a class="btn btn-outline btn-sm min-h-11" href="/budget">Atur budget {labelBulan(bulan)}</a>
+						<a class="btn btn-outline btn-sm min-h-11" href="/budget">Atur budget {formatMonth(month)}</a>
 					</div>
 				{:else}
 					<Progress
 						value={data.budget_total > 0 ? (data.budget_spent * 100) / data.budget_total : 0}
 						status={data.budget_status}
-						label={`Pemakaian budget ${labelBulan(bulan)}`}
-						tebal
+						label={`Pemakaian budget ${formatMonth(month)}`}
+						thick
 					/>
 					<p class="text-sm">
-						{statusBudgetLabel(data.budget_status)}. Terpakai {formatRupiah(data.budget_spent)} dari
+						{budgetStatusLabel(data.budget_status)}. Terpakai {formatRupiah(data.budget_spent)} dari
 						{formatRupiah(data.budget_total)}.
 					</p>
 				{/if}
 			</div>
 		</section>
 
-		<!-- Uang masuk, uang keluar, selisih: satu kartu karena dibaca berurutan. -->
+		<!-- One card: income, expense and net are read in sequence. -->
 		<section class="card bg-base-200" aria-label="Ringkasan uang bulan ini">
 			<div class="card-body grid grid-cols-3 gap-2 p-4">
 				<div>
@@ -254,19 +253,19 @@
 					</div>
 				</div>
 			{:else}
-				<ul class="anim-daftar space-y-2">
+				<ul class="anim-list space-y-2">
 					{#each data.needs as need (need.id)}
 						<li>
 							<button
 								type="button"
 								class="card w-full bg-base-200 text-left transition-colors hover:bg-base-300/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-								onclick={() => bukaBayar(need)}
+								onclick={() => openPayment(need)}
 							>
 								<div class="card-body flex-row items-center justify-between gap-3 p-4">
 									<div>
 										<p class="font-medium">{need.name}</p>
 										<p class="text-xs {need.overdue ? 'font-semibold text-error-ink' : 'opacity-70'}">
-											{need.overdue ? 'Telat sejak' : 'Jatuh tempo'} {labelTanggalPendek(need.due_date)}
+											{need.overdue ? 'Telat sejak' : 'Jatuh tempo'} {formatDateShort(need.due_date)}
 										</p>
 									</div>
 									<span class="font-display text-base font-semibold tabular-nums">
@@ -297,29 +296,29 @@
 		{/if}
 
 		{#if data.top_categories.length > 0}
-			<section class="card bg-base-200" aria-labelledby="judul-kategori">
+			<section class="card bg-base-200" aria-labelledby="category-title">
 				<div class="card-body gap-3 p-4">
 					<div class="flex items-baseline justify-between gap-2">
-						<h2 id="judul-kategori" class="font-display text-base font-semibold">Paling banyak dipakai</h2>
+						<h2 id="category-title" class="font-display text-base font-semibold">Paling banyak dipakai</h2>
 						<a class="link inline-block py-1.5 text-xs font-semibold" href="/budget">Atur budget</a>
 					</div>
 
 					<ul class="space-y-3">
-						{#each data.top_categories as kategori (kategori.category_id ?? kategori.category_name)}
+						{#each data.top_categories as category (category.category_id ?? category.category_name)}
 							<li class="space-y-1">
 								<div class="flex items-baseline justify-between gap-3 text-sm">
-									<span class="font-medium">{kategori.category_name}</span>
+									<span class="font-medium">{category.category_name}</span>
 									<span class="tabular-nums opacity-70">
-										{formatRupiah(kategori.spent)}
-										{#if kategori.budget > 0}
-											<span>/ {formatRupiah(kategori.budget)}</span>
+										{formatRupiah(category.spent)}
+										{#if category.budget > 0}
+											<span>/ {formatRupiah(category.budget)}</span>
 										{/if}
 									</span>
 								</div>
 								<Progress
-									value={kategori.progress}
-									status={kategori.status}
-									label={`Pemakaian ${kategori.category_name}`}
+									value={category.progress}
+									status={category.status}
+									label={`Pemakaian ${category.category_name}`}
 								/>
 							</li>
 						{/each}
@@ -341,25 +340,25 @@
 					message={'Ketik "kopi 25rb" di kolom obrolan bawah, nanti ANABUL catat sendiri.'}
 				/>
 			{:else}
-				<ul class="anim-daftar space-y-2">
-					{#each data.recent as transaksi (transaksi.id)}
+				<ul class="anim-list space-y-2">
+					{#each data.recent as transaction (transaction.id)}
 						<li class="card bg-base-200">
 							<div class="card-body flex-row items-center justify-between gap-3 p-4">
 								<div class="min-w-0">
-									<p class="truncate font-medium">{transaksi.note || 'Tanpa catatan'}</p>
+									<p class="truncate font-medium">{transaction.note || 'Tanpa catatan'}</p>
 									<p class="text-xs opacity-70">
-										{labelHari(transaksi.occurred_at)}
-										{#if transaksi.category_name}
-											· {transaksi.category_name}
+										{formatDay(transaction.occurred_at)}
+										{#if transaction.category_name}
+											· {transaction.category_name}
 										{/if}
 									</p>
 								</div>
 								<span
-									class="font-display text-base font-semibold tabular-nums {transaksi.type === 'income'
+									class="font-display text-base font-semibold tabular-nums {transaction.type === 'income'
 										? 'text-success-ink'
 										: 'text-error-ink'}"
 								>
-									{transaksi.type === 'income' ? '+' : '-'}{formatRupiah(transaksi.amount)}
+									{transaction.type === 'income' ? '+' : '-'}{formatRupiah(transaction.amount)}
 								</span>
 							</div>
 						</li>
@@ -372,28 +371,28 @@
 	<ChatPanel />
 </div>
 
-<Confetti trigger={perayaan} />
+<Confetti trigger={celebration} />
 
 <Sheet
-	open={perluDibayar !== null}
-	title={perluDibayar ? `Bayar ${perluDibayar.name}` : 'Bayar kebutuhan'}
+	open={needToPay !== null}
+	title={needToPay ? `Bayar ${needToPay.name}` : 'Bayar kebutuhan'}
 	description="Nominal bisa diubah kalau tagihannya beda dari perkiraan."
-	onclose={() => (perluDibayar = null)}
+	onclose={() => (needToPay = null)}
 >
 	<form
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void bayar();
+			void pay();
 		}}
 	>
 		<div>
-			<label class="label pb-1 text-sm font-semibold" for="nominal-bayar">Nominal</label>
-			<MoneyInput id="nominal-bayar" value={nominalBayar} onchange={(value) => (nominalBayar = value)} />
+			<label class="label pb-1 text-sm font-semibold" for="payment-amount">Nominal</label>
+			<MoneyInput id="payment-amount" value={paymentAmount} onchange={(value) => (paymentAmount = value)} />
 		</div>
 		<div class="flex flex-wrap justify-end gap-2">
-			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (perluDibayar = null)}>Batal</button>
-			<button type="submit" class="btn btn-primary min-h-11" disabled={nominalBayar <= 0}>
+			<button type="button" class="btn btn-ghost min-h-11" onclick={() => (needToPay = null)}>Batal</button>
+			<button type="submit" class="btn btn-primary min-h-11" disabled={paymentAmount <= 0}>
 				Tandai lunas
 			</button>
 		</div>

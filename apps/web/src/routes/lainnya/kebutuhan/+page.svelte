@@ -5,70 +5,70 @@
 	import MoneyInput from '#lib/components/MoneyInput.svelte';
 	import Sheet from '#lib/components/Sheet.svelte';
 	import StateBlock from '#lib/components/StateBlock.svelte';
-	import { bulanIni, formatRupiah, geserBulan, labelBulan, labelTanggalPendek } from '#lib/format';
-	import { getarRingan } from '#lib/haptic';
+	import { currentMonth, formatRupiah, shiftMonth, formatMonth, formatDateShort } from '#lib/format';
+	import { hapticLight } from '#lib/haptic';
 	import { toast } from '#lib/toast.svelte';
 	import type { Category, Need, RecurringNeed } from '#lib/types';
 
-	let bulan = $state(bulanIni());
-	let template = $state<RecurringNeed[]>([]);
-	let kebutuhan = $state<Need[]>([]);
-	let kategori = $state<Category[]>([]);
-	let memuat = $state(true);
-	let pesanError = $state('');
-	let memproses = $state(false);
-	let perayaan = $state(0);
+	let month = $state(currentMonth());
+	let templates = $state<RecurringNeed[]>([]);
+	let needs = $state<Need[]>([]);
+	let categories = $state<Category[]>([]);
+	let loading = $state(true);
+	let errorMessage = $state('');
+	let processing = $state(false);
+	let celebration = $state(0);
 
 	let editor = $state<RecurringNeed | null>(null);
-	let tambahTerbuka = $state(false);
+	let addSheetOpen = $state(false);
 	let form = $state({ name: '', amount: 0, due_day: 1, category_id: 0 });
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
+	async function load() {
+		loading = true;
+		errorMessage = '';
 		try {
-			const [templateHasil, kebutuhanHasil] = await Promise.all([
+			const [templatesResult, needsResult] = await Promise.all([
 				api.recurringNeeds(),
-				api.needs(bulan)
+				api.needs(month)
 			]);
-			template = templateHasil.recurring_needs;
-			kebutuhan = kebutuhanHasil.needs;
+			templates = templatesResult.recurring_needs;
+			needs = needsResult.needs;
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat kebutuhan bulanan.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat kebutuhan bulanan.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
 	onMount(async () => {
 		try {
-			kategori = (await api.categories()).categories;
+			categories = (await api.categories()).categories;
 		} catch {
 			toast('Gagal memuat daftar kategori.', 'error');
 		}
-		void muat();
+		void load();
 	});
 
 	$effect(() => {
-		bulan;
-		void muat();
+		month;
+		void load();
 	});
 
-	async function generate() {
-		memproses = true;
+	async function generateNeeds() {
+		processing = true;
 		try {
-			const hasil = await api.generateNeeds(bulan);
-			toast(hasil.needs > 0 ? `${hasil.needs} kebutuhan disiapkan untuk ${labelBulan(bulan)}.` : 'Semua kebutuhan bulan ini sudah ada.');
-			await muat();
+			const result = await api.generateNeeds(month);
+			toast(result.needs > 0 ? `${result.needs} kebutuhan disiapkan untuk ${formatMonth(month)}.` : 'Semua kebutuhan bulan ini sudah ada.');
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyiapkan kebutuhan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function simpanTemplate() {
-		memproses = true;
+	async function saveTemplate() {
+		processing = true;
 		try {
 			const payload = {
 				name: form.name,
@@ -84,61 +84,61 @@
 				toast('Kebutuhan baru disimpan.');
 			}
 			editor = null;
-			tambahTerbuka = false;
+			addSheetOpen = false;
 			form = { name: '', amount: 0, due_day: 1, category_id: 0 };
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan kebutuhan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function nonaktifkan(item: RecurringNeed) {
-		memproses = true;
+	async function toggleActive(item: RecurringNeed) {
+		processing = true;
 		try {
 			await api.updateRecurringNeed(item.id, { active: !item.active });
 			toast(item.active ? `${item.name} dimatikan.` : `${item.name} diaktifkan lagi.`);
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal mengubah kebutuhan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function hapus(item: RecurringNeed) {
-		memproses = true;
+	async function remove(item: RecurringNeed) {
+		processing = true;
 		try {
 			await api.deleteRecurringNeed(item.id);
 			editor = null;
 			toast(`${item.name} dihapus dari template.`);
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menghapus kebutuhan.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function ubahStatus(item: Need) {
-		memproses = true;
+	async function toggleStatus(item: Need) {
+		processing = true;
 		try {
 			if (item.status === 'paid') {
 				await api.unpayNeed(item.id);
-				getarRingan();
+				hapticLight();
 				toast(`${item.name} dibuka lagi. Transaksi yang sudah dibuat tetap ada.`);
 			} else {
 				await api.payNeed(item.id, item.amount);
-				perayaan += 1;
-				getarRingan();
+				celebration += 1;
+				hapticLight();
 				toast(`${item.name} ditandai lunas.`);
 			}
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal mengubah status.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 </script>
@@ -147,7 +147,7 @@
 	<title>Kebutuhan bulanan — ANABUL</title>
 </svelte:head>
 
-<Confetti trigger={perayaan} />
+<Confetti trigger={celebration} />
 
 <div class="space-y-4">
 	<header class="flex items-center justify-between gap-2">
@@ -158,7 +158,7 @@
 			onclick={() => {
 				editor = null;
 				form = { name: '', amount: 0, due_day: 1, category_id: 0 };
-				tambahTerbuka = true;
+				addSheetOpen = true;
 			}}
 		>
 			Tambah
@@ -166,44 +166,44 @@
 	</header>
 
 	<div class="flex items-center justify-between gap-2">
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, -1))} aria-label="Bulan sebelumnya">‹</button>
-		<span class="font-display text-base font-semibold">{labelBulan(bulan)}</span>
-		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (bulan = geserBulan(bulan, 1))} aria-label="Bulan berikutnya">›</button>
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, -1))} aria-label="Bulan sebelumnya">‹</button>
+		<span class="font-display text-base font-semibold">{formatMonth(month)}</span>
+		<button type="button" class="btn btn-ghost min-h-11 min-w-11 px-3" onclick={() => (month = shiftMonth(month, 1))} aria-label="Bulan berikutnya">›</button>
 	</div>
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
 	{:else}
 		<section aria-labelledby="judul-bulan-ini">
 			<div class="mb-2 flex items-baseline justify-between gap-2">
-				<h2 id="judul-bulan-ini" class="font-display text-base font-semibold">Daftar {labelBulan(bulan)}</h2>
-				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={generate} disabled={memproses}>
+				<h2 id="judul-bulan-ini" class="font-display text-base font-semibold">Daftar {formatMonth(month)}</h2>
+				<button type="button" class="btn btn-outline btn-sm min-h-11" onclick={generateNeeds} disabled={processing}>
 					Siapkan dari template
 				</button>
 			</div>
 
-			{#if kebutuhan.length === 0}
+			{#if needs.length === 0}
 				<StateBlock
 					state="empty"
 					title="Belum ada kebutuhan bulan ini"
 					message="Tambahkan template dulu (mis. listrik tanggal 5), lalu ketuk Siapkan dari template."
 				/>
 			{:else}
-				<ul class="anim-daftar space-y-2">
-					{#each kebutuhan as item (item.id)}
+				<ul class="anim-list space-y-2">
+					{#each needs as item (item.id)}
 						<li class="card bg-base-200">
 							<div class="card-body flex-row items-center justify-between gap-3 p-4">
 								<div>
 									<p class="font-medium {item.status === 'paid' ? 'line-through opacity-70' : ''}">{item.name}</p>
 									<p class="text-xs {item.overdue ? 'font-semibold text-error-ink' : 'opacity-70'}">
-										{formatRupiah(item.amount)} · jatuh tempo {labelTanggalPendek(item.due_date)}
+										{formatRupiah(item.amount)} · jatuh tempo {formatDateShort(item.due_date)}
 										{#if item.status === 'paid'}· lunas{/if}
 										{#if item.overdue}· telat{/if}
 									</p>
 								</div>
-								<button type="button" class="btn btn-sm min-h-11 {item.status === 'paid' ? 'btn-ghost' : 'btn-primary'}" onclick={() => void ubahStatus(item)} disabled={memproses}>
+								<button type="button" class="btn btn-sm min-h-11 {item.status === 'paid' ? 'btn-ghost' : 'btn-primary'}" onclick={() => void toggleStatus(item)} disabled={processing}>
 									{item.status === 'paid' ? 'Batal lunas' : 'Tandai lunas'}
 								</button>
 							</div>
@@ -216,11 +216,11 @@
 		<section aria-labelledby="judul-template">
 			<h2 id="judul-template" class="mb-2 font-display text-base font-semibold">Template rutin</h2>
 
-			{#if template.length === 0}
+			{#if templates.length === 0}
 				<StateBlock state="empty" title="Belum ada template" message="Template dipakai untuk menyiapkan daftar kebutuhan tiap awal bulan." />
 			{:else}
-				<ul class="anim-daftar space-y-2">
-					{#each template as item (item.id)}
+				<ul class="anim-list space-y-2">
+					{#each templates as item (item.id)}
 						<li class="card bg-base-200">
 							<div class="card-body gap-2 p-4">
 								<div class="flex items-baseline justify-between gap-3">
@@ -252,7 +252,7 @@
 									>
 										Ubah
 									</button>
-									<button type="button" class="btn btn-ghost btn-sm min-h-11" onclick={() => void nonaktifkan(item)} disabled={memproses}>
+									<button type="button" class="btn btn-ghost btn-sm min-h-11" onclick={() => void toggleActive(item)} disabled={processing}>
 										{item.active ? 'Matikan' : 'Aktifkan'}
 									</button>
 								</div>
@@ -266,11 +266,11 @@
 </div>
 
 <Sheet
-	open={tambahTerbuka || editor !== null}
+	open={addSheetOpen || editor !== null}
 	title={editor ? `Ubah ${editor.name}` : 'Kebutuhan baru'}
 	description="Template ini dipakai untuk menyiapkan daftar kebutuhan tiap bulan."
 	onclose={() => {
-		tambahTerbuka = false;
+		addSheetOpen = false;
 		editor = null;
 	}}
 >
@@ -278,7 +278,7 @@
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void simpanTemplate();
+			void saveTemplate();
 		}}
 	>
 		<div>
@@ -299,14 +299,14 @@
 			<label class="label pb-1 text-sm font-semibold" for="kategori-kebutuhan">Kategori</label>
 			<select id="kategori-kebutuhan" class="select select-bordered min-h-11 w-full" bind:value={form.category_id}>
 				<option value={0}>Tanpa kategori</option>
-				{#each kategori as item (item.id)}
+				{#each categories as item (item.id)}
 					<option value={item.id}>{item.name}</option>
 				{/each}
 			</select>
 		</div>
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			{#if editor}
-				<button type="button" class="btn btn-ghost min-h-11 text-error-ink" onclick={() => editor && void hapus(editor)} disabled={memproses}>
+				<button type="button" class="btn btn-ghost min-h-11 text-error-ink" onclick={() => editor && void remove(editor)} disabled={processing}>
 					Hapus
 				</button>
 			{/if}
@@ -315,14 +315,14 @@
 					type="button"
 					class="btn btn-ghost min-h-11"
 					onclick={() => {
-						tambahTerbuka = false;
+						addSheetOpen = false;
 						editor = null;
 					}}
 				>
 					Batal
 				</button>
-				<button type="submit" class="btn btn-primary min-h-11" disabled={memproses || !form.name.trim()}>
-					{memproses ? 'Menyimpan...' : 'Simpan'}
+				<button type="submit" class="btn btn-primary min-h-11" disabled={processing || !form.name.trim()}>
+					{processing ? 'Menyimpan...' : 'Simpan'}
 				</button>
 			</div>
 		</div>

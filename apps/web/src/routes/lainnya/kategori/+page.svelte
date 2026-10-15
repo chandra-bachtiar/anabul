@@ -6,93 +6,93 @@
 	import { toast } from '#lib/toast.svelte';
 	import type { Account, Category } from '#lib/types';
 
-	let kategori = $state<Category[]>([]);
-	let akun = $state<Account[]>([]);
-	let memuat = $state(true);
-	let pesanError = $state('');
-	let memproses = $state(false);
+	let categories = $state<Category[]>([]);
+	let accounts = $state<Account[]>([]);
+	let loading = $state(true);
+	let errorMessage = $state('');
+	let processing = $state(false);
 
-	let kategoriBaru = $state('');
-	let akunBaru = $state('');
+	let newCategory = $state('');
+	let newAccount = $state('');
 	let editor = $state<Category | null>(null);
-	let formKategori = $state({ name: '', keywords: '' });
+	let categoryForm = $state({ name: '', keywords: '' });
 
-	async function muat() {
-		memuat = true;
-		pesanError = '';
+	async function load() {
+		loading = true;
+		errorMessage = '';
 		try {
-			const [kategoriHasil, akunHasil] = await Promise.all([api.categories(), api.accounts()]);
-			kategori = kategoriHasil.categories;
-			akun = akunHasil.accounts;
+			const [categoriesResult, accountsResult] = await Promise.all([api.categories(), api.accounts()]);
+			categories = categoriesResult.categories;
+			accounts = accountsResult.accounts;
 		} catch (error) {
-			pesanError = error instanceof ApiError ? error.message : 'Gagal memuat kategori dan akun.';
+			errorMessage = error instanceof ApiError ? error.message : 'Gagal memuat kategori dan akun.';
 		} finally {
-			memuat = false;
+			loading = false;
 		}
 	}
 
-	onMount(() => void muat());
+	onMount(() => void load());
 
-	async function tambahKategori() {
-		if (!kategoriBaru.trim()) return;
-		memproses = true;
+	async function createCategory() {
+		if (!newCategory.trim()) return;
+		processing = true;
 		try {
-			await api.createCategory(kategoriBaru.trim());
-			toast(`Kategori ${kategoriBaru.trim()} ditambahkan.`);
-			kategoriBaru = '';
-			await muat();
+			await api.createCategory(newCategory.trim());
+			toast(`Kategori ${newCategory.trim()} ditambahkan.`);
+			newCategory = '';
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menambah kategori.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function simpanKategori() {
+	async function saveCategory() {
 		if (!editor) return;
-		memproses = true;
+		processing = true;
 		try {
-			const keywords = formKategori.keywords
+			const keywords = categoryForm.keywords
 				.split(',')
 				.map((item) => item.trim())
 				.filter((item) => item.length > 0);
-			await api.updateCategory(editor.id, { name: formKategori.name, keywords });
+			await api.updateCategory(editor.id, { name: categoryForm.name, keywords });
 			toast('Kategori diperbarui.');
 			editor = null;
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menyimpan kategori.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function hapusKategori(item: Category) {
-		memproses = true;
+	async function removeCategory(item: Category) {
+		processing = true;
 		try {
 			await api.deleteCategory(item.id);
 			toast(`Kategori ${item.name} dihapus. Transaksi lamanya jadi tanpa kategori.`);
 			editor = null;
-			await muat();
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menghapus kategori.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 
-	async function tambahAkun() {
-		if (!akunBaru.trim()) return;
-		memproses = true;
+	async function createAccount() {
+		if (!newAccount.trim()) return;
+		processing = true;
 		try {
-			await api.createAccount(akunBaru.trim());
-			toast(`Akun ${akunBaru.trim()} ditambahkan.`);
-			akunBaru = '';
-			await muat();
+			await api.createAccount(newAccount.trim());
+			toast(`Akun ${newAccount.trim()} ditambahkan.`);
+			newAccount = '';
+			await load();
 		} catch (error) {
 			toast(error instanceof ApiError ? error.message : 'Gagal menambah akun.', 'error');
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 </script>
@@ -104,29 +104,29 @@
 <div class="space-y-4">
 	<h1 class="font-display text-2xl font-semibold">Kategori dan akun</h1>
 
-	{#if memuat}
+	{#if loading}
 		<StateBlock state="loading" />
-	{:else if pesanError}
-		<StateBlock state="error" message={pesanError} actionLabel="Coba lagi" onaction={() => void muat()} />
+	{:else if errorMessage}
+		<StateBlock state="error" message={errorMessage} actionLabel="Coba lagi" onaction={() => void load()} />
 	{:else}
-		<section class="card bg-base-200" aria-labelledby="judul-kategori">
+		<section class="card bg-base-200" aria-labelledby="category-title">
 			<div class="card-body gap-3 p-4">
-				<h2 id="judul-kategori" class="font-display text-base font-semibold">Kategori</h2>
+				<h2 id="category-title" class="font-display text-base font-semibold">Kategori</h2>
 
 				<form
 					class="flex gap-2"
 					onsubmit={(event) => {
 						event.preventDefault();
-						void tambahKategori();
+						void createCategory();
 					}}
 				>
 					<label class="sr-only" for="kategori-baru">Nama kategori baru</label>
-					<input id="kategori-baru" class="input input-bordered min-h-11 w-full" placeholder="mis. langganan" bind:value={kategoriBaru} />
-					<button type="submit" class="btn btn-primary min-h-11" disabled={memproses || !kategoriBaru.trim()}>Tambah</button>
+					<input id="kategori-baru" class="input input-bordered min-h-11 w-full" placeholder="mis. langganan" bind:value={newCategory} />
+					<button type="submit" class="btn btn-primary min-h-11" disabled={processing || !newCategory.trim()}>Tambah</button>
 				</form>
 
 				<ul class="space-y-2">
-					{#each kategori as item (item.id)}
+					{#each categories as item (item.id)}
 						<li class="flex items-center justify-between gap-2 rounded-xl bg-base-300/40 px-3 py-2">
 							<div class="min-w-0">
 								<p class="truncate text-sm font-medium">{item.name}</p>
@@ -139,7 +139,7 @@
 								class="btn btn-ghost btn-sm min-h-11"
 								onclick={() => {
 									editor = item;
-									formKategori = { name: item.name, keywords: item.keywords.join(', ') };
+									categoryForm = { name: item.name, keywords: item.keywords.join(', ') };
 								}}
 							>
 								Ubah
@@ -163,16 +163,16 @@
 					class="flex gap-2"
 					onsubmit={(event) => {
 						event.preventDefault();
-						void tambahAkun();
+						void createAccount();
 					}}
 				>
 					<label class="sr-only" for="akun-baru">Nama akun baru</label>
-					<input id="akun-baru" class="input input-bordered min-h-11 w-full" placeholder="mis. dompet digital" bind:value={akunBaru} />
-					<button type="submit" class="btn btn-primary min-h-11" disabled={memproses || !akunBaru.trim()}>Tambah</button>
+					<input id="akun-baru" class="input input-bordered min-h-11 w-full" placeholder="mis. dompet digital" bind:value={newAccount} />
+					<button type="submit" class="btn btn-primary min-h-11" disabled={processing || !newAccount.trim()}>Tambah</button>
 				</form>
 
 				<ul class="flex flex-wrap gap-2">
-					{#each akun as item (item.id)}
+					{#each accounts as item (item.id)}
 						<li class="badge badge-lg bg-base-300/60 px-3 py-3">{item.name}</li>
 					{/each}
 				</ul>
@@ -193,26 +193,26 @@
 		class="space-y-4"
 		onsubmit={(event) => {
 			event.preventDefault();
-			void simpanKategori();
+			void saveCategory();
 		}}
 	>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="nama-kategori">Nama</label>
-			<input id="nama-kategori" class="input input-bordered min-h-11 w-full" bind:value={formKategori.name} required />
+			<input id="nama-kategori" class="input input-bordered min-h-11 w-full" bind:value={categoryForm.name} required />
 		</div>
 		<div>
 			<label class="label pb-1 text-sm font-semibold" for="kata-kunci">Kata kunci</label>
-			<input id="kata-kunci" class="input input-bordered min-h-11 w-full" placeholder="kopi, jajan, warung" bind:value={formKategori.keywords} />
+			<input id="kata-kunci" class="input input-bordered min-h-11 w-full" placeholder="kopi, jajan, warung" bind:value={categoryForm.keywords} />
 		</div>
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			{#if editor}
-				<button type="button" class="btn btn-ghost min-h-11 text-error-ink" onclick={() => editor && void hapusKategori(editor)} disabled={memproses}>
+				<button type="button" class="btn btn-ghost min-h-11 text-error-ink" onclick={() => editor && void removeCategory(editor)} disabled={processing}>
 					Hapus kategori
 				</button>
 			{/if}
 			<div class="flex gap-2">
 				<button type="button" class="btn btn-ghost min-h-11" onclick={() => (editor = null)}>Batal</button>
-				<button type="submit" class="btn btn-primary min-h-11" disabled={memproses}>Simpan</button>
+				<button type="submit" class="btn btn-primary min-h-11" disabled={processing}>Simpan</button>
 			</div>
 		</div>
 	</form>

@@ -1,24 +1,21 @@
 import { api, ApiError } from './api';
 
-export interface PesanChat {
+export interface ChatMessage {
 	id: number;
 	role: 'user' | 'assistant';
 	text: string;
-	pending?: { id: string; summary: string; selesai?: 'dikonfirmasi' | 'dibatalkan' };
-	undo?: { transaction_id: number; label?: string; dipakai?: boolean };
-	gagal?: boolean;
+	pending?: { id: string; summary: string; done?: 'confirmed' | 'cancelled' };
+	undo?: { transaction_id: number; label?: string; used?: boolean };
+	failed?: boolean;
 }
 
 let counter = 0;
 const listeners = new Set<() => void>();
 
-/**
- * Riwayat chat disimpan di level modul supaya tidak hilang saat berpindah tab
- * dalam satu sesi berjalan.
- */
+/** Module-level, so the history survives tab switches within a session. */
 export const chatState = $state({
-	items: [] as PesanChat[],
-	mengirim: false
+	items: [] as ChatMessage[],
+	sending: false
 });
 
 export function onChatChange(fn: () => void): () => void {
@@ -28,11 +25,11 @@ export function onChatChange(fn: () => void): () => void {
 	};
 }
 
-function beriTahu(): void {
+function notify(): void {
 	for (const fn of listeners) fn();
 }
 
-function pesanError(error: unknown): string {
+function errorMessage(error: unknown): string {
 	if (error instanceof ApiError) {
 		if (error.available?.length) {
 			return `${error.message}\nPilihan yang ada: ${error.available.join(', ')}`;
@@ -42,78 +39,78 @@ function pesanError(error: unknown): string {
 	return 'Ada gangguan saat menghubungi server. Coba lagi ya.';
 }
 
-export async function kirimPesan(teks: string): Promise<void> {
-	const isi = teks.trim();
-	if (!isi || chatState.mengirim) return;
+export async function sendMessage(text: string): Promise<void> {
+	const content = text.trim();
+	if (!content || chatState.sending) return;
 
-	chatState.items.push({ id: ++counter, role: 'user', text: isi });
-	chatState.mengirim = true;
+	chatState.items.push({ id: ++counter, role: 'user', text: content });
+	chatState.sending = true;
 
 	try {
-		const balasan = await api.chat(isi);
+		const reply = await api.chat(content);
 		chatState.items.push({
 			id: ++counter,
 			role: 'assistant',
-			text: balasan.reply,
-			pending: balasan.pending_action,
-			undo: balasan.undo
+			text: reply.reply,
+			pending: reply.pending_action,
+			undo: reply.undo
 		});
-		beriTahu();
+		notify();
 	} catch (error) {
-		chatState.items.push({ id: ++counter, role: 'assistant', text: pesanError(error), gagal: true });
+		chatState.items.push({ id: ++counter, role: 'assistant', text: errorMessage(error), failed: true });
 	} finally {
-		chatState.mengirim = false;
+		chatState.sending = false;
 	}
 }
 
-export async function ulangiPesanTerakhir(): Promise<void> {
-	const terakhir = [...chatState.items].reverse().find((item) => item.role === 'user');
-	if (!terakhir) return;
-	chatState.items = chatState.items.filter((item) => !item.gagal);
-	await kirimPesan(terakhir.text);
+export async function retryLastMessage(): Promise<void> {
+	const last = [...chatState.items].reverse().find((item) => item.role === 'user');
+	if (!last) return;
+	chatState.items = chatState.items.filter((item) => !item.failed);
+	await sendMessage(last.text);
 }
 
-export async function konfirmasiAksi(pesan: PesanChat): Promise<void> {
-	if (!pesan.pending || chatState.mengirim) return;
-	chatState.mengirim = true;
+export async function confirmAction(message: ChatMessage): Promise<void> {
+	if (!message.pending || chatState.sending) return;
+	chatState.sending = true;
 	try {
-		const balasan = await api.confirmAction(pesan.pending.id);
-		pesan.pending.selesai = 'dikonfirmasi';
-		chatState.items.push({ id: ++counter, role: 'assistant', text: balasan.reply, undo: balasan.undo });
-		beriTahu();
+		const reply = await api.confirmAction(message.pending.id);
+		message.pending.done = 'confirmed';
+		chatState.items.push({ id: ++counter, role: 'assistant', text: reply.reply, undo: reply.undo });
+		notify();
 	} catch (error) {
-		chatState.items.push({ id: ++counter, role: 'assistant', text: pesanError(error), gagal: true });
+		chatState.items.push({ id: ++counter, role: 'assistant', text: errorMessage(error), failed: true });
 	} finally {
-		chatState.mengirim = false;
+		chatState.sending = false;
 	}
 }
 
-export async function batalAksi(pesan: PesanChat): Promise<void> {
-	if (!pesan.pending || chatState.mengirim) return;
-	chatState.mengirim = true;
+export async function cancelAction(message: ChatMessage): Promise<void> {
+	if (!message.pending || chatState.sending) return;
+	chatState.sending = true;
 	try {
-		const balasan = await api.cancelAction(pesan.pending.id);
-		pesan.pending.selesai = 'dibatalkan';
-		chatState.items.push({ id: ++counter, role: 'assistant', text: balasan.reply });
+		const reply = await api.cancelAction(message.pending.id);
+		message.pending.done = 'cancelled';
+		chatState.items.push({ id: ++counter, role: 'assistant', text: reply.reply });
 	} catch (error) {
-		chatState.items.push({ id: ++counter, role: 'assistant', text: pesanError(error), gagal: true });
+		chatState.items.push({ id: ++counter, role: 'assistant', text: errorMessage(error), failed: true });
 	} finally {
-		chatState.mengirim = false;
+		chatState.sending = false;
 	}
 }
 
-export async function batalkanTransaksi(pesan: PesanChat): Promise<void> {
-	if (!pesan.undo || pesan.undo.dipakai) return;
+export async function undoTransaction(message: ChatMessage): Promise<void> {
+	if (!message.undo || message.undo.used) return;
 	try {
-		await api.deleteTransaction(pesan.undo.transaction_id);
-		pesan.undo.dipakai = true;
+		await api.deleteTransaction(message.undo.transaction_id);
+		message.undo.used = true;
 		chatState.items.push({ id: ++counter, role: 'assistant', text: 'Sudah dibatalkan, catatannya dihapus.' });
-		beriTahu();
+		notify();
 	} catch (error) {
-		chatState.items.push({ id: ++counter, role: 'assistant', text: pesanError(error), gagal: true });
+		chatState.items.push({ id: ++counter, role: 'assistant', text: errorMessage(error), failed: true });
 	}
 }
 
-export function resetChat(): void {
+export function resetChatState(): void {
 	chatState.items = [];
 }

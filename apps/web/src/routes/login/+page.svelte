@@ -6,15 +6,15 @@
 	import { toast } from '#lib/toast.svelte';
 
 	let password = $state('');
-	let pesanError = $state('');
-	let memproses = $state(false);
+	let errorMessage = $state('');
+	let processing = $state(false);
 
-	async function kirim(event: SubmitEvent) {
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (memproses) return;
+		if (processing) return;
 
-		memproses = true;
-		pesanError = '';
+		processing = true;
+		errorMessage = '';
 		try {
 			await login(password);
 			if (session.usingDefaultPassword) {
@@ -22,10 +22,10 @@
 			}
 			await goto('/');
 		} catch (error) {
-			pesanError =
+			errorMessage =
 				error instanceof ApiError ? error.message : 'Login gagal. Coba lagi sebentar lagi.';
 		} finally {
-			memproses = false;
+			processing = false;
 		}
 	}
 </script>
@@ -36,14 +36,14 @@
 
 <div class="flex min-h-[80dvh] flex-col justify-center gap-6">
 	<header class="flex flex-col items-center gap-3 text-center">
-		<Mascot mood="senang" size={132} />
+		<Mascot mood="happy" size={132} />
 		<div>
 			<h1 class="font-display text-3xl font-semibold tracking-wide text-primary-ink">ANABUL</h1>
 			<p class="text-sm opacity-70">Asisten Ngatur Anggaran Bulanan</p>
 		</div>
 	</header>
 
-	<form class="card bg-base-200" onsubmit={kirim}>
+	<form class="card bg-base-200" onsubmit={submit}>
 		<div class="card-body gap-4">
 			<div>
 				<label class="label pb-1 text-sm font-semibold" for="password">Password</label>
@@ -57,9 +57,9 @@
 				/>
 			</div>
 
-			{#if pesanError}
+			{#if errorMessage}
 				<p class="rounded-xl border border-error/40 bg-error/10 px-3 py-2 text-sm text-error-ink" role="alert">
-					{pesanError}
+					{errorMessage}
 				</p>
 			{/if}
 
@@ -70,8 +70,8 @@
 				</p>
 			{/if}
 
-			<button type="submit" class="btn btn-primary min-h-11 w-full text-base" disabled={memproses}>
-				{memproses ? 'Memeriksa...' : 'Masuk'}
+			<button type="submit" class="btn btn-primary min-h-11 w-full text-base" disabled={processing}>
+				{processing ? 'Memeriksa...' : 'Masuk'}
 			</button>
 
 			<p class="text-center text-xs opacity-70">

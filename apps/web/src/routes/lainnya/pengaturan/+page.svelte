@@ -6,60 +6,60 @@
 	import { setTheme, theme } from '#lib/theme.svelte';
 	import { toast } from '#lib/toast.svelte';
 
-	let keluarProses = $state(false);
+	let signingOut = $state(false);
 
-	let passwordLama = $state('');
-	let passwordBaru = $state('');
-	let passwordUlang = $state('');
-	let pesanPassword = $state('');
-	let simpanPassword = $state(false);
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let repeatPassword = $state('');
+	let passwordError = $state('');
+	let savingPassword = $state(false);
 
-	async function keluar() {
-		keluarProses = true;
+	async function signOut() {
+		signingOut = true;
 		try {
 			await logout();
 			await goto('/login');
 		} catch {
 			toast('Gagal keluar, coba lagi ya.', 'error');
 		} finally {
-			keluarProses = false;
+			signingOut = false;
 		}
 	}
 
-	async function gantiPassword(event: SubmitEvent) {
+	async function changePassword(event: SubmitEvent) {
 		event.preventDefault();
-		if (simpanPassword) return;
+		if (savingPassword) return;
 
-		pesanPassword = '';
-		if (passwordBaru.length < 8) {
-			pesanPassword = 'Password baru minimal 8 karakter.';
+		passwordError = '';
+		if (newPassword.length < 8) {
+			passwordError = 'Password baru minimal 8 karakter.';
 			return;
 		}
-		if (passwordBaru !== passwordUlang) {
-			pesanPassword = 'Ulangi password baru belum sama.';
+		if (newPassword !== repeatPassword) {
+			passwordError = 'Ulangi password baru belum sama.';
 			return;
 		}
 
-		simpanPassword = true;
+		savingPassword = true;
 		try {
-			const hasil = await api.changePassword(passwordLama, passwordBaru);
-			session.usingDefaultPassword = hasil.using_default_password ?? false;
-			passwordLama = '';
-			passwordBaru = '';
-			passwordUlang = '';
+			const result = await api.changePassword(currentPassword, newPassword);
+			session.usingDefaultPassword = result.using_default_password ?? false;
+			currentPassword = '';
+			newPassword = '';
+			repeatPassword = '';
 			toast('Password diganti. Catat yang baru ya.', 'ok', 5000);
 		} catch (error) {
-			pesanPassword =
+			passwordError =
 				error instanceof ApiError ? error.message : 'Gagal mengganti password, coba lagi.';
 		} finally {
-			simpanPassword = false;
+			savingPassword = false;
 		}
 	}
 
-	const pilihanTema = [
-		{ nilai: 'system' as const, label: 'Ikut sistem' },
-		{ nilai: 'light' as const, label: 'Terang' },
-		{ nilai: 'dark' as const, label: 'Gelap' }
+	const themeOptions = [
+		{ value: 'system' as const, label: 'Ikut sistem' },
+		{ value: 'light' as const, label: 'Terang' },
+		{ value: 'dark' as const, label: 'Gelap' }
 	];
 </script>
 
@@ -76,13 +76,13 @@
 			<p class="text-xs opacity-70">Krem hangat untuk siang, cokelat gelap untuk malam. Pilihanmu disimpan di perangkat ini.</p>
 
 			<div class="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pilih tema">
-				{#each pilihanTema as item (item.nilai)}
+				{#each themeOptions as item (item.value)}
 					<button
 						type="button"
 						role="radio"
-						aria-checked={theme.mode === item.nilai}
-						class="btn min-h-11 {theme.mode === item.nilai ? 'btn-primary' : 'btn-outline'}"
-						onclick={() => setTheme(item.nilai)}
+						aria-checked={theme.mode === item.value}
+						class="btn min-h-11 {theme.mode === item.value ? 'btn-primary' : 'btn-outline'}"
+						onclick={() => setTheme(item.value)}
 					>
 						{item.label}
 					</button>
@@ -106,7 +106,7 @@
 				</p>
 			{/if}
 
-			<form class="space-y-3" onsubmit={gantiPassword}>
+			<form class="space-y-3" onsubmit={changePassword}>
 				<div>
 					<label class="label pb-1 text-sm font-semibold" for="password-lama">Password sekarang</label>
 					<input
@@ -114,7 +114,7 @@
 						type="password"
 						autocomplete="current-password"
 						class="input input-bordered min-h-11 w-full"
-						bind:value={passwordLama}
+						bind:value={currentPassword}
 						required
 					/>
 				</div>
@@ -126,7 +126,7 @@
 						autocomplete="new-password"
 						minlength="8"
 						class="input input-bordered min-h-11 w-full"
-						bind:value={passwordBaru}
+						bind:value={newPassword}
 						required
 					/>
 				</div>
@@ -138,19 +138,19 @@
 						autocomplete="new-password"
 						minlength="8"
 						class="input input-bordered min-h-11 w-full"
-						bind:value={passwordUlang}
+						bind:value={repeatPassword}
 						required
 					/>
 				</div>
 
-				{#if pesanPassword}
+				{#if passwordError}
 					<p class="rounded-xl border border-error/40 bg-error/10 px-3 py-2 text-sm text-error-ink" role="alert">
-						{pesanPassword}
+						{passwordError}
 					</p>
 				{/if}
 
-				<button type="submit" class="btn btn-primary min-h-11 self-start" disabled={simpanPassword}>
-					{simpanPassword ? 'Menyimpan...' : 'Simpan password baru'}
+				<button type="submit" class="btn btn-primary min-h-11 self-start" disabled={savingPassword}>
+					{savingPassword ? 'Menyimpan...' : 'Simpan password baru'}
 				</button>
 			</form>
 		</div>
@@ -158,7 +158,7 @@
 
 	<section class="card bg-base-200" aria-labelledby="judul-tentang">
 		<div class="card-body flex-row items-start gap-3 p-4">
-			<Mascot mood="senang" size={56} alt="" />
+			<Mascot mood="happy" size={56} alt="" />
 			<div class="space-y-1">
 				<h2 id="judul-tentang" class="font-display text-base font-semibold">Tentang ANABUL</h2>
 				<p class="text-sm opacity-80">
@@ -177,8 +177,8 @@
 		<div class="card-body gap-3 p-4">
 			<h2 id="judul-keluar" class="font-display text-base font-semibold">Sesi</h2>
 			<p class="text-sm opacity-80">Keluar akan menghapus cookie sesi di perangkat ini. Datamu tetap aman di server.</p>
-			<button type="button" class="btn btn-outline min-h-11 self-start" onclick={keluar} disabled={keluarProses}>
-				{keluarProses ? 'Keluar...' : 'Keluar dari sesi'}
+			<button type="button" class="btn btn-outline min-h-11 self-start" onclick={signOut} disabled={signingOut}>
+				{signingOut ? 'Keluar...' : 'Keluar dari sesi'}
 			</button>
 		</div>
 	</section>

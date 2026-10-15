@@ -6,31 +6,31 @@
 	import { page } from '$app/state';
 	import BottomNav from '#lib/components/BottomNav.svelte';
 	import Toasts from '#lib/components/Toasts.svelte';
-	import { bolehBergerak } from '#lib/haptic';
+	import { motionAllowed } from '#lib/haptic';
 	import { checkSession, session } from '#lib/session.svelte';
 	import { initTheme } from '#lib/theme.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
-	const jalur = $derived(page.url.pathname);
-	const diLogin = $derived(jalur === '/login');
-	const durasiPindah = $derived(bolehBergerak() ? 180 : 0);
+	const pathname = $derived(page.url.pathname);
+	const onLoginPage = $derived(pathname === '/login');
+	const transitionDuration = $derived(motionAllowed() ? 180 : 0);
 
 	onMount(() => {
 		initTheme();
 		void checkSession();
 
-		// Service worker hanya di build produksi; saat dev bisa mengganggu HMR.
+		// Service worker is production-only; during dev it interferes with HMR.
 		if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 			navigator.serviceWorker.register('/sw.js').catch(() => {
-				// Offline mode gagal disiapkan, aplikasi tetap jalan online.
+				// Offline support is optional, the app still runs online.
 			});
 		}
 	});
 
 	$effect(() => {
-		if (session.checked && !session.authenticated && !diLogin) {
+		if (session.checked && !session.authenticated && !onLoginPage) {
 			void goto('/login', { replaceState: true });
 		}
 	});
@@ -43,9 +43,8 @@
 				<p class="text-sm opacity-70">Menyiapkan ANABUL...</p>
 			</div>
 		{:else}
-			<!-- Halaman berganti dengan lembut supaya tidak terasa kaku. -->
-			{#key jalur}
-				<div in:fade={{ duration: durasiPindah }}>
+			{#key pathname}
+				<div in:fade={{ duration: transitionDuration }}>
 					{@render children()}
 				</div>
 			{/key}
@@ -53,8 +52,8 @@
 	</main>
 </div>
 
-{#if session.authenticated && !diLogin}
-	<BottomNav active={jalur} />
+{#if session.authenticated && !onLoginPage}
+	<BottomNav active={pathname} />
 {/if}
 
 <Toasts />

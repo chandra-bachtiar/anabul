@@ -1,7 +1,7 @@
 export type TransactionType = 'expense' | 'income';
 export type DebtDirection = 'hutang' | 'piutang';
 export type BudgetStatus = 'ok' | 'warn' | 'over' | 'none';
-export type Mood = 'senang' | 'khawatir' | 'tidur';
+export type Mood = 'happy' | 'worried' | 'asleep';
 
 export interface Transaction {
 	id: number;

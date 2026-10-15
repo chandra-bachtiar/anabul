@@ -1,17 +1,18 @@
 type ThemeMode = 'system' | 'light' | 'dark';
 
+/** Key stays as-is: renaming it would wipe the theme saved on existing devices. */
 const STORAGE_KEY = 'anabul-tema';
 
 /**
- * Tema mengikuti sistem secara default. Pengguna bisa memaksa terang/gelap
- * dari Pengaturan; pilihannya disimpan di perangkat.
+ * Theme follows the system unless the user forces light or dark in Settings;
+ * the choice is stored per device.
  */
 export const theme = $state({
 	mode: 'system' as ThemeMode,
 	resolved: 'light' as 'light' | 'dark'
 });
 
-function sistemGelap(): boolean {
+function prefersDark(): boolean {
 	if (typeof window === 'undefined') return false;
 	return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
@@ -22,7 +23,7 @@ export function applyTheme(): void {
 
 	if (theme.mode === 'system') {
 		root.removeAttribute('data-theme');
-		theme.resolved = sistemGelap() ? 'dark' : 'light';
+		theme.resolved = prefersDark() ? 'dark' : 'light';
 	} else {
 		root.setAttribute('data-theme', theme.mode === 'dark' ? 'anabul-dark' : 'anabul');
 		theme.resolved = theme.mode;

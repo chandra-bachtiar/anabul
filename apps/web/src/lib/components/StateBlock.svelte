@@ -32,7 +32,7 @@
 {:else if state === 'empty'}
 	<div class="card bg-base-200">
 		<div class="card-body items-center gap-2 py-8 text-center">
-			<Mascot mood="tidur" size={104} alt="" />
+			<Mascot mood="asleep" size={104} alt="" />
 			<p class="font-medium">{title ?? 'Belum ada catatan'}</p>
 			{#if message}
 				<p class="max-w-[28ch] text-sm opacity-70">{message}</p>

@@ -4,27 +4,27 @@
 	const menu = [
 		{
 			href: '/lainnya/kebutuhan',
-			judul: 'Kebutuhan bulanan',
-			ket: 'Listrik, internet, cicilan, dan tagihan rutin lain.'
+			title: 'Kebutuhan bulanan',
+			description: 'Listrik, internet, cicilan, dan tagihan rutin lain.'
 		},
 		{
 			href: '/tutup-bulan',
-			judul: 'Tutup bulan',
-			ket: 'Lihat ringkasan, kunci bulan, lalu siapkan bulan berikutnya.'
+			title: 'Tutup bulan',
+			description: 'Lihat ringkasan, kunci bulan, lalu siapkan bulan berikutnya.'
 		},
 		{
 			href: '/lainnya/kategori',
-			judul: 'Kategori dan akun',
-			ket: 'Atur kategori pengeluaran dan daftar akun (cash, bank, e-wallet).'
+			title: 'Kategori dan akun',
+			description: 'Atur kategori pengeluaran dan daftar akun (cash, bank, e-wallet).'
 		},
 		{
 			href: '/lainnya/pengaturan',
-			judul: 'Pengaturan',
-			ket: 'Tema terang atau gelap, info versi, dan keluar dari sesi.'
+			title: 'Pengaturan',
+			description: 'Tema terang atau gelap, info versi, dan keluar dari sesi.'
 		}
 	];
 
-	const jalur = $derived(page.url.pathname);
+	const pathname = $derived(page.url.pathname);
 </script>
 
 <svelte:head>
@@ -39,13 +39,13 @@
 			<li>
 				<a
 					href={item.href}
-					aria-current={jalur === item.href ? 'page' : undefined}
+					aria-current={pathname === item.href ? 'page' : undefined}
 					class="card bg-base-200 transition-colors hover:bg-base-300/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
 				>
 					<div class="card-body flex-row items-center justify-between gap-3 p-4">
 						<div>
-							<p class="font-medium">{item.judul}</p>
-							<p class="text-xs opacity-70">{item.ket}</p>
+							<p class="font-medium">{item.title}</p>
+							<p class="text-xs opacity-70">{item.description}</p>
 						</div>
 						<svg viewBox="0 0 24 24" class="h-5 w-5 shrink-0 opacity-70" fill="none" aria-hidden="true">
 							<path d="M9.5 6.5 15 12l-5.5 5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
