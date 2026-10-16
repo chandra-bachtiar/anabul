@@ -6,6 +6,11 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/) dan
 
 ## [Unreleased]
 
+### Ditambahkan
+
+- Image rilis dipublikasikan otomatis ke GHCR (`ghcr.io/chandra-bachtiar/anabul`) saat tag
+  `v*` dipush, sekaligus membuat GitHub Release dengan catatan yang digenerate
+
 ## [0.1.0] - 2026-10-15
 
 Rilis pertama.

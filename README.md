@@ -89,6 +89,10 @@ dalam aplikasi setelah berhasil masuk (lihat [Password](#password)).
 **3. Jalankan aplikasinya**
 
 ```sh
+# pakai image rilis dari GHCR (daftar versinya ada di Releases)
+docker run -d --name anabul -p 8080:8080 --env-file .env ghcr.io/chandra-bachtiar/anabul:v0.1.0-alpha
+
+# atau build sendiri
 make docker          # docker build -t anabul .
 docker run -d --name anabul -p 8080:8080 --env-file .env anabul
 ```

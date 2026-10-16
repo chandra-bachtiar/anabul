@@ -104,6 +104,13 @@ Dockerfile multi-stage:
 Nama image: `anabul`. Image stateless; state hanya di PostgreSQL (lokal via compose atau hosted seperti Neon, cukup ganti `DATABASE_URL`). Karena database tidak lagi ikut
 container, `docker run` cukup diberi `--env-file .env`. Webhook Telegram butuh HTTPS publik (reverse proxy seperti Caddy/Traefik atau tunnel). Pastikan versi base image dicek ulang saat implementasi.
 
+## Rilis
+Tag `v*` yang dipush memicu workflow `Release`: image dibangun dari `Dockerfile` yang sama
+dengan CI, dipush ke GHCR sebagai `ghcr.io/chandra-bachtiar/anabul:<tag>`, lalu sebuah
+GitHub Release dibuat otomatis dengan catatan yang digenerate. Tag bersufiks seperti
+`v0.1.0-alpha` ditandai sebagai prerelease. Versi mengikuti semver 0.x selama aplikasi
+masih dipakai satu orang, dan riwayat perubahan tetap ditulis manual di `CHANGELOG.md`.
+
 ## Observabilitas dan backup
 - Log terstruktur (`slog`), tabel `agent_logs` untuk jejak agent
 - Header pengaman di semua respons: CSP (skrip inline SvelteKit diizinkan lewat hash yang
