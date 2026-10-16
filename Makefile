@@ -22,8 +22,10 @@ sqlc:
 	# Use the official image so sqlc does not have to be installed locally.
 	docker run --rm -v "$(CURDIR)/$(API_DIR):/src" -w /src sqlc/sqlc generate
 
+# The auth and agent tests both migrate the same database; -p 1 runs one package
+# at a time so the goose migrations cannot race each other.
 test:
-	cd $(API_DIR) && go test ./...
+	cd $(API_DIR) && go test ./... -p 1
 	cd $(WEB_DIR) && npm run check
 
 build-web:

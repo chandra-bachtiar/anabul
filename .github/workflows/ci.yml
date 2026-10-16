@@ -43,7 +43,9 @@ jobs:
         run: go vet ./...
       - name: go test
         working-directory: apps/api
-        run: go test ./... -count=1
+        # The auth and agent tests both migrate the same database, so packages
+        # run one at a time and the goose migrations cannot race each other.
+        run: go test ./... -count=1 -p 1
 
   web:
     name: Web (SvelteKit)
