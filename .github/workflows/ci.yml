@@ -30,7 +30,7 @@ jobs:
     env:
       ANABUL_TEST_DATABASE_URL: postgres://app:app@localhost:5432/finance?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
@@ -49,7 +49,7 @@ jobs:
     name: Web (SvelteKit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -69,6 +69,6 @@ jobs:
     name: Docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: build image
         run: docker build -t anabul:ci .
