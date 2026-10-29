@@ -19,7 +19,7 @@
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.6.5",
 		"daisyui": "^5.7.48",
-		"svelte": "^5.57.1",
+		"svelte": "^5.57.3",
 		"svelte-check": "^4.6.0",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^6.0.3",
