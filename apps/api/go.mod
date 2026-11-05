@@ -3,7 +3,7 @@ module anabul
 go 1.26.0
 
 require (
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.58.0
